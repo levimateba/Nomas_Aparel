@@ -8,10 +8,24 @@ use Illuminate\Http\Request;
 
 class BlogController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        $posts = BlogPost::where('published', true)->latest('published_at')->paginate(10);
-        return view('frontend.blog.index', compact('posts'));
+        $query = BlogPost::where('published', true)->latest('published_at');
+
+        if ($request->filled('category')) {
+            $query->where('category', $request->category);
+        }
+
+        $posts = $query->paginate(10)->withQueryString();
+
+        $categories = BlogPost::where('published', true)
+            ->whereNotNull('category')
+            ->where('category', '!=', '')
+            ->distinct()
+            ->orderBy('category')
+            ->pluck('category');
+
+        return view('frontend.blog.index', compact('posts', 'categories'));
     }
 
     public function show($slug)

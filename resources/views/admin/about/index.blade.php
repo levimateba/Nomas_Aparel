@@ -3,7 +3,7 @@
 @section('title','About Sections')
 @section('content')
     <h2>About Sections</h2>
-    <a class="btn" href="{{ route('admin.about.create') }}">New section</a>
+    <a class="btn" href="{{ route('admin.about.create') }}">Create About Section</a>
     <div class="card">
         <table>
             <thead><tr><th>Title</th><th>Content</th><th>Actions</th></tr></thead>

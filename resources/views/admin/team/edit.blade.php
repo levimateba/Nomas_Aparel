@@ -1,7 +1,7 @@
 @extends('layouts.admin')
-@section('title','Edit Team Member')
+@section('title','Edit Professional')
 @section('content')
-    <h2>Edit Team Member</h2>
+    <h2>Edit Professional</h2>
     <div class="card">
         <form method="POST" action="{{ route('admin.team.update', $member) }}" enctype="multipart/form-data">
             @csrf

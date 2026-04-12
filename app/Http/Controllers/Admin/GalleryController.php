@@ -22,8 +22,11 @@ class GalleryController extends Controller
     public function store(Request $request)
     {
         $data = $request->validate([
-            'title' => 'required|string|max:255',
-            'image' => 'required|image|mimes:jpeg,png,jpg,gif|max:4096',
+            'title'             => 'required|string|max:255',
+            'category'          => 'nullable|string|max:100',
+            'short_description' => 'nullable|string|max:255',
+            'description'       => 'nullable|string',
+            'image'             => 'required|image|mimes:jpeg,png,jpg,gif|max:4096',
         ]);
 
         $data['image'] = $request->file('image')->store('gallery', 'public');
@@ -40,8 +43,11 @@ class GalleryController extends Controller
     public function update(Request $request, GalleryItem $gallery)
     {
         $data = $request->validate([
-            'title' => 'required|string|max:255',
-            'image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:4096',
+            'title'             => 'required|string|max:255',
+            'category'          => 'nullable|string|max:100',
+            'short_description' => 'nullable|string|max:255',
+            'description'       => 'nullable|string',
+            'image'             => 'nullable|image|mimes:jpeg,png,jpg,gif|max:4096',
         ]);
 
         if ($request->hasFile('image')) {

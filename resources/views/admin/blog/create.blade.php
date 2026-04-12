@@ -9,7 +9,12 @@
             <input type="text" name="title" value="{{ old('title') }}" required>
             
             <label>Category</label>
-            <input type="text" name="category" value="{{ old('category') }}" placeholder="e.g., AI, Technology, Development">
+            <select name="category">
+                <option value="">Select category</option>
+                @foreach($blogCategories as $category)
+                    <option value="{{ $category }}" {{ old('category') === $category ? 'selected' : '' }}>{{ $category }}</option>
+                @endforeach
+            </select>
             
             <label>Author</label>
             <input type="text" name="author" value="{{ old('author', auth()->user()?->name) }}">

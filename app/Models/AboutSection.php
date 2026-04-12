@@ -2,8 +2,8 @@
 
 namespace App\Models;
 
+use App\Support\PublicStorageUrl;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Facades\Storage;
 
 class AboutSection extends Model
 {
@@ -11,18 +11,6 @@ class AboutSection extends Model
 
     public function getImageUrlAttribute($value)
     {
-        if (! $value) {
-            return null;
-        }
-
-        if (str_starts_with($value, 'http://') || str_starts_with($value, 'https://') || str_starts_with($value, '/storage/')) {
-            return $value;
-        }
-
-        if (str_starts_with($value, 'public/')) {
-            return Storage::url(substr($value, 7));
-        }
-
-        return Storage::url($value);
+        return PublicStorageUrl::fromPath($value);
     }
 }

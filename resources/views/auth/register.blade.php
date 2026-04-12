@@ -10,7 +10,7 @@
                 <!-- Header -->
                 <div style="background: linear-gradient(135deg, #16456e 0%, #165752 100%); padding: 30px; color: white; text-align: center;">
                     @if(!empty($settings->logo))
-                        <img src="{{ \Illuminate\Support\Facades\Storage::url($settings->logo) }}" alt="{{ $settings->site_name }}" style="width:72px;height:72px;object-fit:cover;border-radius:16px;background:rgba(255,255,255,0.16);padding:6px;margin-bottom:14px;">
+                        <img src="{{ $settings->logo }}" alt="{{ $settings->site_name }}" style="width:72px;height:72px;object-fit:cover;border-radius:16px;background:rgba(255,255,255,0.16);padding:6px;margin-bottom:14px;">
                     @endif
                     <h2 class="mb-0">Create Account</h2>
                     <p class="mb-0 mt-2" style="opacity: 0.9;">Join {{ $settings->site_name }} Today</p>

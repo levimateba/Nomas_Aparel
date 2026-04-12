@@ -38,7 +38,7 @@ class TeamMemberController extends Controller
 
         TeamMember::create($data);
 
-        return redirect()->route('admin.team.index')->with('success', 'Team member created.');
+        return redirect()->route('admin.team.index')->with('success', 'Professional created.');
     }
 
     public function edit(TeamMember $team)
@@ -65,12 +65,12 @@ class TeamMemberController extends Controller
 
         $team->update($data);
 
-        return redirect()->route('admin.team.index')->with('success', 'Team member updated.');
+        return redirect()->route('admin.team.index')->with('success', 'Professional updated.');
     }
 
     public function destroy(TeamMember $team)
     {
         $team->delete();
-        return redirect()->route('admin.team.index')->with('success', 'Team member deleted.');
+        return redirect()->route('admin.team.index')->with('success', 'Professional deleted.');
     }
 }

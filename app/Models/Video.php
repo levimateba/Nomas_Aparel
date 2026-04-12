@@ -2,8 +2,8 @@
 
 namespace App\Models;
 
+use App\Support\PublicStorageUrl;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Facades\Storage;
 
 class Video extends Model
 {
@@ -16,19 +16,7 @@ class Video extends Model
 
     public function getVideoPathAttribute($value)
     {
-        if (! $value) {
-            return null;
-        }
-
-        if (str_starts_with($value, 'http://') || str_starts_with($value, 'https://') || str_starts_with($value, '/storage/')) {
-            return $value;
-        }
-
-        if (str_starts_with($value, 'public/')) {
-            return Storage::url(substr($value, 7));
-        }
-
-        return Storage::url($value);
+        return PublicStorageUrl::fromPath($value);
     }
 
     public function getVideoUrlAttribute($value)

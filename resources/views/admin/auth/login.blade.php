@@ -98,7 +98,7 @@
         <div class="login-box">
             <div class="login-header">
                 @if(!empty($settings->logo))
-                    <img src="{{ \Illuminate\Support\Facades\Storage::url($settings->logo) }}" alt="{{ $settings->site_name }}" class="login-logo">
+                    <img src="{{ $settings->logo }}" alt="{{ $settings->site_name }}" class="login-logo">
                 @endif
                 <h2 style="margin:0;">Admin Login</h2>
                 <p style="margin:10px 0 0; opacity:0.9;">Manage {{ $settings->site_name }}</p>

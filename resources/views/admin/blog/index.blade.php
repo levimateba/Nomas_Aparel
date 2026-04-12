@@ -3,6 +3,18 @@
 @section('content')
     <h2>Blog Posts</h2>
     <a class="btn" href="{{ route('admin.blog.create') }}">New post</a>
+    <form method="GET" action="{{ route('admin.blog.index') }}" style="margin: 14px 0; display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+        <select name="category" style="max-width: 340px;">
+            <option value="">All Categories</option>
+            @foreach($blogCategories as $category)
+                <option value="{{ $category }}" {{ request('category') === $category ? 'selected' : '' }}>{{ $category }}</option>
+            @endforeach
+        </select>
+        <button class="btn btn-secondary" type="submit">Filter</button>
+        @if(request('category'))
+            <a class="btn btn-secondary" href="{{ route('admin.blog.index') }}">Clear</a>
+        @endif
+    </form>
     <div class="card">
         <table>
             <thead><tr><th>Title</th><th>Category</th><th>Author</th><th>Published</th><th>Actions</th></tr></thead>

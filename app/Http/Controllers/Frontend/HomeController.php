@@ -5,33 +5,40 @@ namespace App\Http\Controllers\Frontend;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Validator;
 use App\Mail\ContactMail;
 
-use App\Models\AboutSection;
-use App\Models\GalleryItem;
-use App\Models\Service;
 use App\Models\Contact;
-use App\Models\BlogPost;
-use App\Models\NewsEvent;
-use App\Models\Price;
-use App\Models\TeamMember;
-use App\Models\Video;
+use App\Models\Category;
+use App\Models\ContactMessage;
+use App\Models\NewsletterSubscriber;
+use App\Models\Product;
 
 class HomeController extends Controller
 {
     public function index()
     {
-        $about = AboutSection::latest()->get();
-        $services = Service::latest()->get();
+        $featuredProducts = Product::query()
+            ->with('category')
+            ->where('is_active', true)
+            ->latest()
+            ->limit(12)
+            ->get();
+        $categories = Category::query()
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->limit(10)
+            ->get();
+        $deals = Product::query()
+            ->where('is_active', true)
+            ->whereNotNull('sale_price')
+            ->whereColumn('sale_price', '<', 'price')
+            ->latest()
+            ->limit(6)
+            ->get();
         $contacts = Contact::latest()->get();
-        $pricePackages = Price::latest()->get();
-        $posts = BlogPost::where('published', true)->latest()->limit(3)->get();
-        $galleryItems = GalleryItem::latest()->limit(6)->get();
-        $newsEvents = NewsEvent::where('published', true)->latest('event_date')->limit(3)->get();
-        $videos = Video::latest()->limit(3)->get();
-        $teamMembers = TeamMember::latest()->limit(6)->get();
 
-        return view('frontend.index', compact('about', 'services', 'contacts', 'pricePackages', 'posts', 'galleryItems', 'newsEvents', 'videos', 'teamMembers'));
+        return view('frontend.index', compact('featuredProducts', 'categories', 'deals', 'contacts'));
     }
 
     public function contact(Request $request)
@@ -43,10 +50,10 @@ class HomeController extends Controller
             'message' => 'required|string',
         ]);
 
-        try {
-            // Save contact to database
-            Contact::create($data);
+        // Store enquiry safely in its own table.
+        ContactMessage::create($data);
 
+        try {
             // Send email to admin
             $admin_email = env('MAIL_FROM_ADDRESS', 'noreply@elgontech.com');
             Mail::to($admin_email)->send(new ContactMail(
@@ -61,10 +68,31 @@ class HomeController extends Controller
                 $data['name'],
                 $data['subject']
             ));
-
-            return back()->with('success', 'Thank you for your message! We will get back to you soon.');
         } catch (\Exception $e) {
-            return back()->with('error', 'Something went wrong. Please try again later.');
+            return back()->with('success', 'Your enquiry was received successfully. We will contact you soon.')->with('error', 'We could not send confirmation email right now, but your enquiry is saved.');
         }
+
+        return back()->with('success', 'Thank you for your message! We will get back to you soon.');
+    }
+
+    public function subscribeNewsletter(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'newsletter_email' => 'required|email|max:255|unique:newsletter_subscribers,email',
+        ], [
+            'newsletter_email.unique' => 'That email is already subscribed.',
+        ]);
+
+        if ($validator->fails()) {
+            return back()
+                ->withErrors($validator, 'newsletter')
+                ->withInput();
+        }
+
+        NewsletterSubscriber::create([
+            'email' => $request->newsletter_email,
+        ]);
+
+        return back()->with('newsletter_success', 'Subscription received successfully.');
     }
 }

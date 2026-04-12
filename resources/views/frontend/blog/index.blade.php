@@ -1,4 +1,4 @@
-@extends('layouts.frontend')
+@extends('layouts.storefront')
 
 @section('title','Blog')
 
@@ -9,6 +9,21 @@
                 <h2 style="font-size: 2.5rem; font-weight: 700; color: var(--primary-dark); margin-bottom: 10px;">Blog</h2>
                 <p style="font-size: 1.1rem; color: #666; margin-bottom: 20px;">Insights, updates, and stories from our team.</p>
                 <div class="line mx-auto"></div>
+            </div>
+
+            <div style="display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin-bottom:28px;">
+                <a href="{{ route('blog.index') }}"
+                   style="text-decoration:none;padding:8px 16px;border-radius:999px;font-size:0.84rem;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;
+                          {{ request('category') ? 'background:#fff;border:1px solid rgba(22,69,110,0.22);color:#16456e;' : 'background:linear-gradient(135deg,#16456e,#165752);color:#fff;border:1px solid transparent;' }}">
+                    All
+                </a>
+                @foreach($categories as $category)
+                    <a href="{{ route('blog.index', ['category' => $category]) }}"
+                       style="text-decoration:none;padding:8px 16px;border-radius:999px;font-size:0.84rem;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;
+                              {{ request('category') === $category ? 'background:linear-gradient(135deg,#16456e,#165752);color:#fff;border:1px solid transparent;' : 'background:#fff;border:1px solid rgba(22,69,110,0.22);color:#16456e;' }}">
+                        {{ $category }}
+                    </a>
+                @endforeach
             </div>
 
             <div class="row">

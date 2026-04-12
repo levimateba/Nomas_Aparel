@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\PublicStorageUrl;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Schema;
 
@@ -34,5 +35,15 @@ class Setting extends Model
             'site_name' => 'Elgon Tech',
             'site_tagline' => 'ICT Consultancy',
         ]);
+    }
+
+    public function getLogoAttribute($value)
+    {
+        return PublicStorageUrl::fromPath($value);
+    }
+
+    public function getFaviconAttribute($value)
+    {
+        return PublicStorageUrl::fromPath($value);
     }
 }

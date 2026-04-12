@@ -6,18 +6,29 @@ use App\Http\Controllers\Controller;
 use App\Models\BlogPost;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 
 class BlogPostController extends Controller
 {
     public function index()
     {
-        $posts = BlogPost::latest('published_at')->paginate(10);
-        return view('admin.blog.index', compact('posts'));
+        $query = BlogPost::latest('published_at');
+
+        if (request()->filled('category')) {
+            $query->where('category', request('category'));
+        }
+
+        $posts = $query->paginate(10)->withQueryString();
+        $blogCategories = config('content_taxonomy.blog_categories', []);
+
+        return view('admin.blog.index', compact('posts', 'blogCategories'));
     }
 
     public function create()
     {
-        return view('admin.blog.create');
+        $blogCategories = config('content_taxonomy.blog_categories', []);
+
+        return view('admin.blog.create', compact('blogCategories'));
     }
 
     public function store(Request $request)
@@ -26,7 +37,7 @@ class BlogPostController extends Controller
             'title' => 'required|string|max:255',
             'content' => 'required|string',
             'excerpt' => 'nullable|string|max:500',
-            'category' => 'nullable|string|max:100',
+            'category' => ['nullable', 'string', Rule::in(config('content_taxonomy.blog_categories', []))],
             'author' => 'nullable|string|max:100',
             'published_at' => 'nullable|date',
             'published' => 'nullable|boolean',
@@ -53,7 +64,9 @@ class BlogPostController extends Controller
     public function edit(BlogPost $blog)
     {
         $post = $blog;
-        return view('admin.blog.edit', compact('post'));
+        $blogCategories = config('content_taxonomy.blog_categories', []);
+
+        return view('admin.blog.edit', compact('post', 'blogCategories'));
     }
 
     public function update(Request $request, BlogPost $blog)
@@ -64,7 +77,7 @@ class BlogPostController extends Controller
             'title' => 'required|string|max:255',
             'content' => 'required|string',
             'excerpt' => 'nullable|string|max:500',
-            'category' => 'nullable|string|max:100',
+            'category' => ['nullable', 'string', Rule::in(config('content_taxonomy.blog_categories', []))],
             'author' => 'nullable|string|max:100',
             'published_at' => 'nullable|date',
             'published' => 'nullable|boolean',

@@ -109,6 +109,30 @@
             <p>Service cards</p>
         </div>
         <div class="card stat-card">
+            <h3>{{ $productCount }}</h3>
+            <p>Products</p>
+        </div>
+        <div class="card stat-card">
+            <h3>{{ $activeProductCount }}</h3>
+            <p>Active products</p>
+        </div>
+        <div class="card stat-card" style="border-left:4px solid #dc2626;">
+            <h3 style="color:#b91c1c;">{{ $lowStockCount }}</h3>
+            <p>Low stock (<= 5)</p>
+        </div>
+        <div class="card stat-card">
+            <h3>{{ $orderCount }}</h3>
+            <p>Total orders</p>
+        </div>
+        <div class="card stat-card" style="border-left:4px solid #c9a227;">
+            <h3 style="color:#7b6116;">{{ $pendingOrderCount }}</h3>
+            <p>Pending/processing orders</p>
+        </div>
+        <div class="card stat-card" style="border-left:4px solid #16a34a;">
+            <h3 style="color:#15803d;">KES {{ number_format($monthlyRevenue, 2) }}</h3>
+            <p>Revenue this month</p>
+        </div>
+        <div class="card stat-card">
             <h3>{{ $priceCount }}</h3>
             <p>Pricing plans</p>
         </div>
@@ -140,6 +164,22 @@
             <h3>{{ $contactCount }}</h3>
             <p>Contact entries</p>
         </div>
+        <div class="card stat-card" style="border-left:4px solid #c9a227;">
+            <h3 style="color:#7b6116;">{{ $enquiryCount }}</h3>
+            <p>Enquiries received</p>
+        </div>
+        <div class="card stat-card" style="border-left:4px solid #7c3aed;">
+            <h3 style="color:#6d28d9;">{{ $subscriberCount }}</h3>
+            <p>Newsletter subscribers</p>
+        </div>
+        <div class="card stat-card" style="border-left:4px solid #2196f3;">
+            <h3 style="color:#1565c0;">{{ $quoteCount }}</h3>
+            <p>Quote requests <strong style="color:#2196f3;">({{ $newQuoteCount }} new)</strong></p>
+        </div>
+        <div class="card stat-card" style="border-left:4px solid #2e7d32;">
+            <h3 style="color:#2e7d32;">{{ $quotationCount }}</h3>
+            <p>Quotations generated</p>
+        </div>
     </div>
 
     <div class="two-col">
@@ -166,7 +206,7 @@
                         <input id="logo" type="file" name="logo" accept="image/*">
                         <div class="hint">Upload a logo once and it will be reused across the frontend and admin area.</div>
                         @if(!empty($settings->logo))
-                            <img src="{{ \Illuminate\Support\Facades\Storage::url($settings->logo) }}" alt="{{ $settings->site_name }}" class="preview-logo">
+                            <img src="{{ $settings->logo }}" alt="{{ $settings->site_name }}" class="preview-logo">
                         @endif
                     </div>
                 </div>

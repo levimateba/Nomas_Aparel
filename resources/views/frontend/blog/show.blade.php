@@ -1,4 +1,4 @@
-@extends('layouts.frontend')
+@extends('layouts.storefront')
 
 @section('title',$post->title)
 

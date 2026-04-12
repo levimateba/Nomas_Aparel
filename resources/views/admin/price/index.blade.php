@@ -5,11 +5,13 @@
     <a class="btn" href="{{ route('admin.price.create') }}">New plan</a>
     <div class="card">
         <table>
-            <thead><tr><th>Title</th><th>Amount</th><th>Period</th><th>Featured</th><th>Actions</th></tr></thead>
+            <thead><tr><th>Title</th><th>Subtitle</th><th>Display Price</th><th>Amount</th><th>Period</th><th>Featured</th><th>Actions</th></tr></thead>
             <tbody>
             @forelse($prices as $price)
                 <tr>
                     <td>{{ $price->title }}</td>
+                    <td>{{ $price->subtitle ?: '—' }}</td>
+                    <td>{{ $price->display_price ?: '—' }}</td>
                     <td>{{ number_format($price->amount,2) }}</td>
                     <td>{{ $price->billing_period }}</td>
                     <td>{{ $price->featured ? 'Yes' : 'No' }}</td>
@@ -24,7 +26,7 @@
                     </td>
                 </tr>
             @empty
-                <tr><td colspan="5">No pricing plans yet.</td></tr>
+                <tr><td colspan="7">No pricing plans yet.</td></tr>
             @endforelse
             </tbody>
         </table>
