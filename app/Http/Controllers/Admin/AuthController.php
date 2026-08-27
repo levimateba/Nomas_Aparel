@@ -20,14 +20,24 @@ class AuthController extends Controller
             'password' => ['required', 'string'],
         ]);
 
-        $credentials['is_admin'] = true;
-
-        if (Auth::attempt($credentials, $request->boolean('remember')) ) {
-            $request->session()->regenerate();
-            return redirect()->intended(route('admin.dashboard'));
+        if (! Auth::attempt($credentials, $request->boolean('remember'))) {
+            return back()->withErrors(['email' => 'The provided credentials do not match our records.']);
         }
 
-        return back()->withErrors(['email' => 'The provided credentials do not match our records.']);
+        $user = Auth::user();
+        $user?->loadMissing(['roles', 'role']);
+
+        if (! $user || ! $user->isAdminUser()) {
+            Auth::logout();
+            $request->session()->invalidate();
+            $request->session()->regenerateToken();
+
+            return back()->withErrors(['email' => 'You do not have access to the admin panel.']);
+        }
+
+        $request->session()->regenerate();
+
+        return redirect()->intended(route('admin.dashboard'));
     }
 
     public function logout(Request $request)

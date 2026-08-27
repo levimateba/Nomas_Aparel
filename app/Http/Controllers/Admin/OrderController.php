@@ -9,17 +9,21 @@ use App\Models\Setting;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Schema;
 
 class OrderController extends Controller
 {
     public function index()
     {
-        $query = Order::query()->latest();
+        $query = Order::query()->with('user')->latest();
         if (request()->filled('status')) {
             $query->where('status', request('status'));
         }
         if (request()->filled('payment_method')) {
             $query->where('payment_method', request('payment_method'));
+        }
+        if (request()->filled('source') && Schema::hasColumn('orders', 'source')) {
+            $query->where('source', request('source'));
         }
         if (request()->filled('q')) {
             $term = trim((string) request('q'));
@@ -144,6 +148,9 @@ class OrderController extends Controller
         if ($request->filled('payment_method')) {
             $query->where('payment_method', $request->string('payment_method')->toString());
         }
+        if ($request->filled('source') && Schema::hasColumn('orders', 'source')) {
+            $query->where('source', $request->string('source')->toString());
+        }
         if ($request->filled('q')) {
             $term = trim($request->string('q')->toString());
             $query->where(function ($builder) use ($term) {
@@ -164,7 +171,7 @@ class OrderController extends Controller
 
         return response()->streamDownload(function () use ($rows) {
             $output = fopen('php://output', 'w');
-            fputcsv($output, ['ID', 'Order Number', 'Customer', 'Email', 'Phone', 'Payment', 'Status', 'Total', 'Date']);
+            fputcsv($output, ['ID', 'Order Number', 'Customer', 'Email', 'Phone', 'Payment', 'Source', 'Status', 'Total', 'Date']);
             foreach ($rows as $row) {
                 fputcsv($output, [
                     $row->id,
@@ -173,6 +180,7 @@ class OrderController extends Controller
                     $row->customer_email,
                     $row->customer_phone,
                     $row->payment_method,
+                    $row->source ?? (str_starts_with((string) $row->order_number, 'POS-') ? 'pos' : 'online'),
                     $row->status,
                     $row->total_amount,
                     $row->created_at?->toDateTimeString(),

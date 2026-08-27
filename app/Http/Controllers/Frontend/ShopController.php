@@ -6,12 +6,19 @@ use App\Http\Controllers\Controller;
 use App\Models\Category;
 use App\Models\Product;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Schema;
 
 class ShopController extends Controller
 {
     public function index(Request $request)
     {
-        $query = Product::query()->with(['category', 'vendor'])->where('is_active', true);
+        $query = Product::query()
+            ->with(['category', 'vendor'])
+            ->when(Schema::hasTable('product_reviews'), function ($builder) {
+                $builder->withCount(['reviews' => fn ($reviews) => $reviews->where('approved', true)])
+                    ->withAvg(['reviews' => fn ($reviews) => $reviews->where('approved', true)], 'rating');
+            })
+            ->where('is_active', true);
 
         if ($request->filled('category_id')) {
             $query->where('category_id', $request->integer('category_id'));
@@ -23,6 +30,9 @@ class ShopController extends Controller
                 $builder->where('name', 'like', '%' . $search . '%')
                     ->orWhere('description', 'like', '%' . $search . '%')
                     ->orWhere('sku', 'like', '%' . $search . '%');
+                if (Schema::hasColumn('products', 'barcode')) {
+                    $builder->orWhere('barcode', 'like', '%' . $search . '%');
+                }
             });
         }
 
@@ -36,7 +46,7 @@ class ShopController extends Controller
         }
 
         $products = $query->paginate(16)->withQueryString();
-        $categories = Category::query()->where('is_active', true)->orderBy('name')->get();
+        $categories = Category::query()->where('is_active', true)->orderBy('id')->get();
 
         return view('frontend.shop.index', compact('products', 'categories'));
     }
@@ -53,7 +63,11 @@ class ShopController extends Controller
         $related = Product::query()
             ->where('is_active', true)
             ->whereKeyNot($product->id)
-            ->with('vendor')
+            ->with(['vendor', 'category'])
+            ->when(Schema::hasTable('product_reviews'), function ($query) {
+                $query->withCount(['reviews' => fn ($reviews) => $reviews->where('approved', true)])
+                    ->withAvg(['reviews' => fn ($reviews) => $reviews->where('approved', true)], 'rating');
+            })
             ->when($product->category_id, function ($query) use ($product) {
                 $query->where('category_id', $product->category_id);
             })

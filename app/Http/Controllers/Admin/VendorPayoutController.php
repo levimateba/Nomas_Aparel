@@ -38,11 +38,16 @@ class VendorPayoutController extends Controller
         }
 
         $payouts = $payoutsQuery->paginate(20)->withQueryString();
+        $stats = [
+            'pending' => VendorPayout::query()->where('status', 'pending')->count(),
+            'paid' => VendorPayout::query()->where('status', 'paid')->count(),
+        ];
 
         return view('admin.vendor-payouts.index', [
             'vendors' => $vendors,
             'payouts' => $payouts,
             'filters' => $filters,
+            'stats' => $stats,
         ]);
     }
 

@@ -1,51 +1,58 @@
 @extends('layouts.admin')
-@section('title', 'Product Reviews')
+@section('title', 'Reviews')
+@section('heading', 'Reviews')
+@section('subheading', 'Approve customer feedback before it appears on products.')
+
 @section('content')
-    <h2>Product Reviews</h2>
-    <form method="GET" action="{{ route('admin.reviews.index') }}" style="margin: 10px 0; display:flex; gap:8px; align-items:center;">
-        <select name="status" style="max-width:180px;">
-            <option value="">All</option>
-            <option value="approved" {{ request('status') === 'approved' ? 'selected' : '' }}>Approved</option>
-            <option value="pending" {{ request('status') === 'pending' ? 'selected' : '' }}>Pending</option>
-        </select>
-        <button class="btn btn-secondary" type="submit">Filter</button>
+    <div class="admin-kpis">
+        <div class="admin-kpi"><span>Total Reviews</span><strong>{{ $stats['total'] }}</strong></div>
+        <div class="admin-kpi"><span>Pending</span><strong>{{ $stats['pending'] }}</strong></div>
+        <div class="admin-kpi"><span>Approved</span><strong>{{ $stats['approved'] }}</strong></div>
+    </div>
+    <form class="admin-toolbar" method="GET" action="{{ route('admin.reviews.index') }}">
+        <div class="admin-filters">
+            <div class="field">
+                <label>Status</label>
+                <select name="status">
+                    <option value="">All</option>
+                    <option value="approved" @selected(request('status') === 'approved')>Approved</option>
+                    <option value="pending" @selected(request('status') === 'pending')>Pending</option>
+                </select>
+            </div>
+            <button class="btn" type="submit">Apply</button>
+        </div>
     </form>
     <div class="card">
-        <table>
-            <thead>
-                <tr>
-                    <th>Product</th>
-                    <th>Reviewer</th>
-                    <th>Rating</th>
-                    <th>Comment</th>
-                    <th>Status</th>
-                    <th>Actions</th>
-                </tr>
-            </thead>
-            <tbody>
-            @forelse($reviews as $review)
-                <tr>
-                    <td>{{ $review->product?->name ?: 'N/A' }}</td>
-                    <td>{{ $review->name }}<br><small>{{ $review->email }}</small></td>
-                    <td>{{ $review->rating }}/5</td>
-                    <td>{{ \Illuminate\Support\Str::limit($review->comment, 120) }}</td>
-                    <td>{{ $review->approved ? 'Approved' : 'Pending' }}</td>
-                    <td>
-                        <form method="POST" action="{{ route('admin.reviews.update', $review) }}">
-                            @csrf @method('PATCH')
-                            <button class="btn btn-secondary" type="submit">{{ $review->approved ? 'Unapprove' : 'Approve' }}</button>
-                        </form>
-                        <form method="POST" action="{{ route('admin.reviews.destroy', $review) }}">
-                            @csrf @method('DELETE')
-                            <button class="btn" type="submit" onclick="return confirm('Delete review?')">Delete</button>
-                        </form>
-                    </td>
-                </tr>
-            @empty
-                <tr><td colspan="6">No reviews yet.</td></tr>
-            @endforelse
-            </tbody>
-        </table>
-        {{ $reviews->links() }}
+        <div class="table-wrap">
+            <table class="admin-table">
+                <thead>
+                    <tr><th>Product</th><th>Reviewer</th><th>Rating</th><th>Comment</th><th>Status</th><th>Actions</th></tr>
+                </thead>
+                <tbody>
+                @forelse($reviews as $review)
+                    <tr>
+                        <td><strong>{{ $review->product?->name ?: 'N/A' }}</strong></td>
+                        <td>{{ $review->name }}<br><span class="muted">{{ $review->email }}</span></td>
+                        <td>{{ $review->rating }}/5</td>
+                        <td>{{ \Illuminate\Support\Str::limit($review->comment, 120) }}</td>
+                        <td><span class="status-pill {{ $review->approved ? 'on' : 'warn' }}">{{ $review->approved ? 'Approved' : 'Pending' }}</span></td>
+                        <td class="row-actions">
+                            <form method="POST" action="{{ route('admin.reviews.update', $review) }}">
+                                @csrf @method('PATCH')
+                                <button class="btn btn-secondary" type="submit">{{ $review->approved ? 'Unapprove' : 'Approve' }}</button>
+                            </form>
+                            <form method="POST" action="{{ route('admin.reviews.destroy', $review) }}">
+                                @csrf @method('DELETE')
+                                <button class="btn btn-danger" type="submit" onclick="return confirm('Delete review?')">Delete</button>
+                            </form>
+                        </td>
+                    </tr>
+                @empty
+                    <tr><td colspan="6" class="empty-cell">No reviews yet.</td></tr>
+                @endforelse
+                </tbody>
+            </table>
+        </div>
+        <div style="margin-top:12px;">{{ $reviews->links() }}</div>
     </div>
 @endsection

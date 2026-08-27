@@ -21,8 +21,13 @@ class ProductQuestionController extends Controller
             }
         }
         $questions = $query->paginate(20)->withQueryString();
+        $stats = [
+            'total' => ProductQuestion::count(),
+            'unanswered' => ProductQuestion::whereNull('answer')->count(),
+            'answered' => ProductQuestion::whereNotNull('answer')->count(),
+        ];
 
-        return view('admin.questions.index', compact('questions'));
+        return view('admin.questions.index', compact('questions', 'stats'));
     }
 
     public function update(Request $request, ProductQuestion $question)

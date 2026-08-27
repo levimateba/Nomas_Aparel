@@ -14,6 +14,18 @@
     .related-grid { display: grid; gap: 12px; grid-template-columns: repeat(4, minmax(0, 1fr)); }
     .item { padding: 12px; }
     .mini { font-size: 12px; color: #6b7280; }
+    .share { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line); }
+    .share h3 { margin: 0 0 10px; font-size: 15px; }
+    .share-row { display: flex; flex-wrap: wrap; gap: 8px; }
+    .share-btn {
+        display: inline-flex; align-items: center; justify-content: center;
+        min-width: 42px; height: 38px; padding: 0 12px; border-radius: 8px;
+        font-size: 13px; font-weight: 700; border: 1px solid var(--line); background: #fff;
+    }
+    .share-btn.whatsapp { background: #25d366; color: #fff; border-color: #25d366; }
+    .share-btn.facebook { background: #1877f2; color: #fff; border-color: #1877f2; }
+    .share-btn.x { background: #111; color: #fff; border-color: #111; }
+    .share-btn.copy { cursor: pointer; }
     @media (max-width: 1000px) { .related-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
     @media (max-width: 900px) { .product-layout { grid-template-columns: 1fr; } }
 </style>
@@ -23,15 +35,32 @@
 <div class="container">
     <div class="product-layout">
         <article class="card main">
-            <div style="height:320px;border-radius:10px;background:#f3f4f6 url('{{ $product->image_url ?: 'https://via.placeholder.com/900x500?text=Product' }}') center/cover no-repeat;"></div>
+            @php $inWishlist = in_array((int) $product->id, array_map('intval', $wishlistIds ?? []), true); @endphp
+            <div class="p-card-media" style="margin-bottom:12px;">
+                <div class="p-card-img" style="height:320px;border-radius:10px;background-image:url('{{ $product->image_url ?: 'https://via.placeholder.com/900x500?text=Product' }}');"></div>
+                @if($product->hasSale())
+                    <span class="p-disc">-{{ $product->discountPercent() }}%</span>
+                @endif
+                @auth
+                    <form class="p-heart {{ $inWishlist ? 'is-on' : '' }}" method="POST" action="{{ $inWishlist ? route('wishlist.destroy', $product) : route('wishlist.store', $product) }}">
+                        @csrf
+                        @if($inWishlist)
+                            @method('DELETE')
+                        @endif
+                        <button type="submit" aria-label="Wishlist">{{ $inWishlist ? '♥' : '♡' }}</button>
+                    </form>
+                @else
+                    <a class="p-heart" href="{{ route('login') }}" aria-label="Login to add wishlist">♡</a>
+                @endauth
+            </div>
             <span class="badge">{{ $product->category?->name ?: 'General' }}</span>
             <h1 class="title">{{ $product->name }}</h1>
             <div class="mini">Sold by: <strong>{{ $product->vendor?->name ?: 'In-house' }}</strong></div>
             <div class="mini" style="margin-bottom:8px;">
                 Rating: {{ $averageRating > 0 ? $averageRating . '/5' : 'No ratings yet' }} ({{ $product->reviews->count() }} reviews)
             </div>
-            <div class="price">KES {{ number_format((float) ($product->sale_price ?: $product->price), 2) }}</div>
-            @if($product->sale_price)
+            <div class="price">KES {{ number_format($product->currentPrice(), 2) }}</div>
+            @if($product->hasSale())
                 <div style="color:#6b7280;">Was KES {{ number_format((float) $product->price, 2) }}</div>
             @endif
             <p class="desc">{{ $product->description }}</p>
@@ -46,11 +75,31 @@
                 <button class="btn btn-primary" style="width: 100%;" type="submit">Add to Cart</button>
             </form>
             @auth
-            <form method="POST" action="{{ route('wishlist.store', $product) }}" style="margin-top:8px;">
-                @csrf
-                <button class="btn" style="width: 100%;" type="submit">Add to Wishlist</button>
-            </form>
+                <form method="POST" action="{{ $inWishlist ? route('wishlist.destroy', $product) : route('wishlist.store', $product) }}" style="margin-top:8px;">
+                    @csrf
+                    @if($inWishlist)
+                        @method('DELETE')
+                    @endif
+                    <button class="btn btn-cart" style="width: 100%;" type="submit">{{ $inWishlist ? 'Remove from Wishlist' : 'Add to Wishlist' }}</button>
+                </form>
+            @else
+                <a class="btn btn-cart" href="{{ route('login') }}" style="display:block;margin-top:8px;text-align:center;">Login to Wishlist</a>
             @endauth
+
+            @php
+                $shareUrl = url()->current();
+                $shareText = $product->name . ' — KES ' . number_format($product->currentPrice(), 2);
+                $shareMessage = $shareText . ' ' . $shareUrl;
+            @endphp
+            <div class="share">
+                <h3>Share this product</h3>
+                <div class="share-row">
+                    <a class="share-btn whatsapp" target="_blank" rel="noopener" href="https://api.whatsapp.com/send?text={{ urlencode($shareMessage) }}">WhatsApp</a>
+                    <a class="share-btn facebook" target="_blank" rel="noopener" href="https://www.facebook.com/sharer/sharer.php?u={{ urlencode($shareUrl) }}">Facebook</a>
+                    <a class="share-btn x" target="_blank" rel="noopener" href="https://twitter.com/intent/tweet?url={{ urlencode($shareUrl) }}&text={{ urlencode($shareText) }}">X</a>
+                    <button type="button" class="share-btn copy" data-share-url="{{ $shareUrl }}">Copy link</button>
+                </div>
+            </div>
             <a href="{{ route('shop.index') }}" style="display:block;margin-top:10px;text-align:center;">Back to shop</a>
         </aside>
     </div>
@@ -120,17 +169,30 @@
         <h2>Related Products</h2>
         <div class="related-grid">
             @forelse($relatedProducts as $related)
-                <article class="card item">
-                    <div class="mini">{{ $related->category?->name ?: 'General' }}</div>
-                    <div class="mini">Seller: {{ $related->vendor?->name ?: 'In-house' }}</div>
-                    <div style="font-weight: 600; margin: 6px 0;">{{ $related->name }}</div>
-                    <div class="mini">KES {{ number_format((float) ($related->sale_price ?: $related->price), 2) }}</div>
-                    <a href="{{ route('shop.show', $related) }}" style="display:inline-block;margin-top:8px;color:var(--brand);font-weight:700;">View</a>
-                </article>
+                @include('frontend.partials.product-card', ['product' => $related, 'showRating' => true, 'showActions' => true])
             @empty
                 <p>No related products.</p>
             @endforelse
         </div>
     </section>
 </div>
+<script>
+    document.querySelectorAll('.share-btn.copy').forEach(function (button) {
+        button.addEventListener('click', function () {
+            const url = button.getAttribute('data-share-url') || window.location.href;
+            const done = function () {
+                const original = button.textContent;
+                button.textContent = 'Copied';
+                setTimeout(function () { button.textContent = original; }, 1600);
+            };
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(url).then(done).catch(function () {
+                    window.prompt('Copy this link', url);
+                });
+            } else {
+                window.prompt('Copy this link', url);
+            }
+        });
+    });
+</script>
 @endsection

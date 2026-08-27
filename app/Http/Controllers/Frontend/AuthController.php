@@ -3,9 +3,9 @@
 namespace App\Http\Controllers\Frontend;
 
 use App\Http\Controllers\Controller;
+use App\Models\Role;
 use App\Models\User;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rules\Password;
 
@@ -14,8 +14,12 @@ class AuthController extends Controller
     /**
      * Show registration form
      */
-    public function showRegister()
+    public function showRegister(Request $request)
     {
+        if ($request->query('redirect') === 'checkout') {
+            session(['url.intended' => route('checkout.index')]);
+        }
+
         return view('auth.register');
     }
 
@@ -31,17 +35,24 @@ class AuthController extends Controller
         ]);
 
         try {
+            $clientsRole = Role::query()->where('slug', 'clients')->first();
+
             $user = User::create([
                 'name' => $validated['name'],
                 'email' => $validated['email'],
-                'password' => Hash::make($validated['password']),
-                'is_admin' => false, // Regular user, not admin
+                'password' => $validated['password'],
+                'is_admin' => false,
+                'role_id' => $clientsRole?->id,
             ]);
+
+            if ($clientsRole) {
+                $user->roles()->sync([$clientsRole->id]);
+            }
 
             // Auto login after registration
             Auth::login($user);
 
-            return redirect()->route('home')
+            return redirect()->intended(route('home'))
                 ->with('success', 'Welcome! Your account has been created successfully.');
         } catch (\Exception $e) {
             return back()->with('error', 'Something went wrong. Please try again.');
@@ -69,7 +80,7 @@ class AuthController extends Controller
         if (Auth::attempt($credentials)) {
             $request->session()->regenerate();
 
-            return redirect()->intended('/')->with('success', 'Welcome back!');
+            return redirect()->intended(route('home'))->with('success', 'Welcome back!');
         }
 
         return back()

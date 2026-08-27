@@ -13,8 +13,12 @@ class VendorController extends Controller
     public function index()
     {
         $vendors = Vendor::query()->withCount('products')->latest()->paginate(20);
+        $stats = [
+            'total' => Vendor::count(),
+            'active' => Vendor::where('is_active', true)->count(),
+        ];
 
-        return view('admin.vendors.index', compact('vendors'));
+        return view('admin.vendors.index', compact('vendors', 'stats'));
     }
 
     public function create()

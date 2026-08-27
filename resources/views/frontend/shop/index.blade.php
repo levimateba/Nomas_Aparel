@@ -54,27 +54,7 @@
             <h2 style="margin: 0 0 12px;">All Products</h2>
             <div class="grid">
                 @forelse($products as $product)
-                    <article class="card item">
-                        <div style="height:150px;border-radius:8px;background:#f3f4f6 url('{{ $product->image_url ?: 'https://via.placeholder.com/300x220?text=Product' }}') center/cover no-repeat;"></div>
-                        <div class="meta">{{ $product->category?->name ?: 'General' }}</div>
-                        <div class="meta">Seller: {{ $product->vendor?->name ?: 'In-house' }}</div>
-                        <div class="title">{{ $product->name }}</div>
-                        <div class="meta">{{ \Illuminate\Support\Str::limit($product->description, 76) }}</div>
-                        <div class="price">KES {{ number_format((float) ($product->sale_price ?: $product->price), 2) }}</div>
-                        <div style="margin-top: 10px; display:flex; gap:8px; flex-wrap:wrap;">
-                            <a href="{{ route('shop.show', $product) }}" class="btn btn-primary" style="display: inline-block; padding: 8px 12px; font-size: 13px;">View Details</a>
-                            <form method="POST" action="{{ route('cart.add', $product) }}">
-                                @csrf
-                                <button type="submit" class="btn" style="padding: 8px 12px; font-size: 13px;">Add to Cart</button>
-                            </form>
-                            @auth
-                            <form method="POST" action="{{ route('wishlist.store', $product) }}">
-                                @csrf
-                                <button type="submit" class="btn" style="padding: 8px 12px; font-size: 13px;">Wishlist</button>
-                            </form>
-                            @endauth
-                        </div>
-                    </article>
+                    @include('frontend.partials.product-card', ['product' => $product, 'showRating' => true, 'showActions' => true])
                 @empty
                     <p>No products match your filters.</p>
                 @endforelse

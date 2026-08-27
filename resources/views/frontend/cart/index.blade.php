@@ -51,14 +51,19 @@
             @endif
         </div>
 
-        <div style="margin-top:14px;display:flex;justify-content:space-between;align-items:center;">
+        <div style="margin-top:14px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;">
             <strong>
                 Subtotal: KES {{ number_format((float) $totals['subtotal'], 2) }}<br>
                 Discount: KES {{ number_format((float) $totals['discount'], 2) }}<br>
                 Total: KES {{ number_format((float) $totals['total'], 2) }}
             </strong>
-            <div style="display:flex;gap:8px;">
-                <a href="{{ route('checkout.index') }}" class="btn btn-primary">Checkout</a>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;">
+                @guest
+                    <a href="{{ route('checkout.index') }}" class="btn btn-primary">Login to checkout</a>
+                    <a href="{{ route('register') }}?redirect=checkout" class="btn">Register</a>
+                @else
+                    <a href="{{ route('checkout.index') }}" class="btn btn-primary">Checkout</a>
+                @endguest
                 <form method="POST" action="{{ route('cart.clear') }}">
                     @csrf
                     <button class="btn" type="submit">Clear Cart</button>
@@ -66,6 +71,9 @@
                 <a href="{{ route('shop.index') }}" class="btn">Continue Shopping</a>
             </div>
         </div>
+        @guest
+            <p style="margin:12px 0 0;color:#6b7280;">You need to login or register before completing checkout.</p>
+        @endguest
     </div>
 </div>
 @endsection

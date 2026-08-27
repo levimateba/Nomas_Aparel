@@ -20,8 +20,12 @@ class BlogPostController extends Controller
 
         $posts = $query->paginate(10)->withQueryString();
         $blogCategories = config('content_taxonomy.blog_categories', []);
+        $stats = [
+            'total' => BlogPost::count(),
+            'published' => BlogPost::whereNotNull('published_at')->count(),
+        ];
 
-        return view('admin.blog.index', compact('posts', 'blogCategories'));
+        return view('admin.blog.index', compact('posts', 'blogCategories', 'stats'));
     }
 
     public function create()

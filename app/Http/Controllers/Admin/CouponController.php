@@ -12,8 +12,13 @@ class CouponController extends Controller
     public function index()
     {
         $coupons = Coupon::query()->latest()->paginate(20);
+        $stats = [
+            'total' => Coupon::count(),
+            'active' => Coupon::where('is_active', true)->count(),
+            'uses' => (int) Coupon::sum('used_count'),
+        ];
 
-        return view('admin.coupons.index', compact('coupons'));
+        return view('admin.coupons.index', compact('coupons', 'stats'));
     }
 
     public function create()

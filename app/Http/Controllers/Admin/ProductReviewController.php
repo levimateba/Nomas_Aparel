@@ -18,8 +18,13 @@ class ProductReviewController extends Controller
         }
 
         $reviews = $query->paginate(20)->withQueryString();
+        $stats = [
+            'total' => ProductReview::count(),
+            'pending' => ProductReview::where('approved', false)->count(),
+            'approved' => ProductReview::where('approved', true)->count(),
+        ];
 
-        return view('admin.reviews.index', compact('reviews'));
+        return view('admin.reviews.index', compact('reviews', 'stats'));
     }
 
     public function update(ProductReview $review): RedirectResponse

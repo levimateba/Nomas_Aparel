@@ -13,6 +13,7 @@ use App\Models\Category;
 use App\Models\ContactMessage;
 use App\Models\NewsletterSubscriber;
 use App\Models\Product;
+use Illuminate\Support\Facades\Schema;
 
 class HomeController extends Controller
 {
@@ -20,25 +21,40 @@ class HomeController extends Controller
     {
         $featuredProducts = Product::query()
             ->with('category')
+            ->when(Schema::hasTable('product_reviews'), function ($query) {
+                $query->withCount(['reviews' => fn ($reviews) => $reviews->where('approved', true)])
+                    ->withAvg(['reviews' => fn ($reviews) => $reviews->where('approved', true)], 'rating');
+            })
             ->where('is_active', true)
             ->latest()
             ->limit(12)
             ->get();
         $categories = Category::query()
             ->where('is_active', true)
-            ->orderBy('name')
-            ->limit(10)
+            ->orderBy('id')
             ->get();
         $deals = Product::query()
+            ->with('category')
             ->where('is_active', true)
             ->whereNotNull('sale_price')
             ->whereColumn('sale_price', '<', 'price')
             ->latest()
             ->limit(6)
             ->get();
+        $heroImages = Product::query()
+            ->where('is_active', true)
+            ->whereNotNull('image_url')
+            ->latest()
+            ->limit(5)
+            ->pluck('image_url');
         $contacts = Contact::latest()->get();
 
-        return view('frontend.index', compact('featuredProducts', 'categories', 'deals', 'contacts'));
+        return view('frontend.index', compact('featuredProducts', 'categories', 'deals', 'heroImages', 'contacts'));
+    }
+
+    public function contactPage()
+    {
+        return view('frontend.contact');
     }
 
     public function contact(Request $request)

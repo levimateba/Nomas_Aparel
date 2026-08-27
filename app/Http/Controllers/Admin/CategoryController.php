@@ -12,9 +12,13 @@ class CategoryController extends Controller
 {
     public function index()
     {
-        $categories = Category::query()->latest()->paginate(12);
+        $categories = Category::query()->withCount('products')->orderBy('id')->paginate(12);
+        $stats = [
+            'total' => Category::count(),
+            'active' => Category::where('is_active', true)->count(),
+        ];
 
-        return view('admin.categories.index', compact('categories'));
+        return view('admin.categories.index', compact('categories', 'stats'));
     }
 
     public function create()

@@ -8,6 +8,7 @@ use App\Models\Product;
 use App\Models\Vendor;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 
@@ -15,7 +16,7 @@ class ProductController extends Controller
 {
     public function index()
     {
-        $query = Product::query()->with('category')->latest();
+        $query = Product::query()->with(['category', 'vendor'])->latest();
         if (request()->filled('stock')) {
             if (request('stock') === 'low') {
                 $query->where('stock', '<=', 5);
@@ -31,12 +32,21 @@ class ProductController extends Controller
             $query->where(function ($builder) use ($term) {
                 $builder->where('name', 'like', '%' . $term . '%')
                     ->orWhere('sku', 'like', '%' . $term . '%');
+                if (Schema::hasColumn('products', 'barcode')) {
+                    $builder->orWhere('barcode', 'like', '%' . $term . '%');
+                }
             });
         }
 
-        $products = $query->paginate(15)->withQueryString();
+        $products = $query->paginate(10)->withQueryString();
+        $stats = [
+            'total'    => Product::count(),
+            'active'   => Product::where('is_active', true)->count(),
+            'low'      => Product::where('is_active', true)->where('stock', '>', 0)->where('stock', '<=', 5)->count(),
+            'out'      => Product::where('stock', 0)->count(),
+        ];
 
-        return view('admin.products.index', compact('products'));
+        return view('admin.products.index', compact('products', 'stats'));
     }
 
     public function create()
@@ -81,7 +91,15 @@ class ProductController extends Controller
 
     public function destroy(Product $product)
     {
-        $product->delete();
+        try {
+            $product->delete();
+        } catch (\Throwable $e) {
+            report($e);
+
+            return back()->withErrors([
+                'product' => 'This product could not be deleted. It may still be linked to other records.',
+            ]);
+        }
 
         return redirect()->route('admin.products.index')->with('success', 'Product removed.');
     }
@@ -128,6 +146,9 @@ class ProductController extends Controller
             $query->where(function ($builder) use ($term) {
                 $builder->where('name', 'like', '%' . $term . '%')
                     ->orWhere('sku', 'like', '%' . $term . '%');
+                if (Schema::hasColumn('products', 'barcode')) {
+                    $builder->orWhere('barcode', 'like', '%' . $term . '%');
+                }
             });
         }
 
@@ -136,12 +157,13 @@ class ProductController extends Controller
 
         return response()->streamDownload(function () use ($rows) {
             $output = fopen('php://output', 'w');
-            fputcsv($output, ['ID', 'Name', 'SKU', 'Category', 'Price', 'Sale Price', 'Stock', 'Status', 'Created At']);
+            fputcsv($output, ['ID', 'Name', 'SKU', 'Barcode', 'Category', 'Price', 'Sale Price', 'Stock', 'Status', 'Created At']);
             foreach ($rows as $row) {
                 fputcsv($output, [
                     $row->id,
                     $row->name,
                     $row->sku,
+                    $row->barcode ?? '',
                     $row->category?->name,
                     $row->price,
                     $row->sale_price,
@@ -156,7 +178,7 @@ class ProductController extends Controller
 
     private function validateData(Request $request, ?Product $product = null): array
     {
-        return $request->validate([
+        $rules = [
             'category_id' => 'nullable|exists:categories,id',
             'vendor_id' => 'nullable|exists:vendors,id',
             'name' => 'required|string|max:255',
@@ -174,12 +196,58 @@ class ProductController extends Controller
             ],
             'description' => 'nullable|string',
             'price' => 'required|numeric|min:0',
+            'discount_percent' => 'nullable|numeric|min:1|max:99',
             'sale_price' => 'nullable|numeric|min:0',
             'stock' => 'required|integer|min:0',
             'image_url' => 'nullable|string|max:255',
             'image_file' => 'nullable|image|max:4096',
             'is_active' => 'nullable|boolean',
-        ]);
+        ];
+
+        if (Schema::hasColumn('products', 'barcode')) {
+            $rules['barcode'] = [
+                'nullable',
+                'string',
+                'max:64',
+                Rule::unique('products', 'barcode')->ignore($product?->id),
+            ];
+        }
+
+        $data = $request->validate($rules);
+
+        $data = $this->applySalePricing($data);
+        unset($data['discount_percent']);
+
+        if (array_key_exists('barcode', $data)) {
+            $barcode = trim((string) ($data['barcode'] ?? ''));
+            $data['barcode'] = $barcode !== '' ? $barcode : null;
+        }
+        if (! Schema::hasColumn('products', 'barcode')) {
+            unset($data['barcode']);
+        }
+
+        return $data;
+    }
+
+    private function applySalePricing(array $data): array
+    {
+        $price = (float) $data['price'];
+        $percent = isset($data['discount_percent']) && $data['discount_percent'] !== null && $data['discount_percent'] !== ''
+            ? (float) $data['discount_percent']
+            : 0.0;
+        $sale = isset($data['sale_price']) && $data['sale_price'] !== null && $data['sale_price'] !== ''
+            ? (float) $data['sale_price']
+            : 0.0;
+
+        if ($percent > 0 && $percent < 100 && $price > 0) {
+            $data['sale_price'] = round($price * (1 - ($percent / 100)), 2);
+        } elseif ($sale > 0 && $sale < $price) {
+            $data['sale_price'] = round($sale, 2);
+        } else {
+            $data['sale_price'] = null;
+        }
+
+        return $data;
     }
 
     private function resolveImageUrl(Request $request, ?Product $product = null): ?string

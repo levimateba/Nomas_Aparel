@@ -20,117 +20,165 @@
     }
 @endphp
 
-@if($errors->any())
-    <div class="alert alert-danger">
-        <ul style="margin:0;padding-left:18px;">
-            @foreach($errors->all() as $error)
-                <li>{{ $error }}</li>
-            @endforeach
-        </ul>
-    </div>
-@endif
+<div class="quotation-form-layout">
+    <section class="quotation-section">
+        <h3>Client Information</h3>
+        <p class="quotation-sub">Capture contact details for the customer receiving this quotation.</p>
 
-<div class="card">
-    <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;">
-        <div>
-            <label>Client Name</label>
-            <input type="text" name="client_name" value="{{ old('client_name', $quotation->client_name ?? '') }}" required>
-        </div>
-        <div>
-            <label>Client Email</label>
-            <input type="email" name="client_email" value="{{ old('client_email', $quotation->client_email ?? '') }}" required>
-        </div>
-        <div>
-            <label>Client Phone</label>
-            <input type="text" name="client_phone" value="{{ old('client_phone', $quotation->client_phone ?? '') }}">
-        </div>
-        <div>
-            <label>Timeline</label>
-            <input type="text" name="timeline" value="{{ old('timeline', $quotation->timeline ?? '') }}" placeholder="e.g. 4-6 weeks">
-        </div>
-        <div style="grid-column:1/-1;">
-            <label>Client Address</label>
-            <input type="text" name="client_address" value="{{ old('client_address', $quotation->client_address ?? '') }}">
-        </div>
-        <div style="grid-column:1/-1;">
-            <label>Project Title</label>
-            <input type="text" name="project_title" value="{{ old('project_title', $quotation->project_title ?? '') }}" required>
-        </div>
-        <div style="grid-column:1/-1;">
-            <label>Description</label>
-            <textarea name="description" rows="3">{{ old('description', $quotation->description ?? '') }}</textarea>
-        </div>
-        <div>
-            <label>Scope of Work</label>
-            <textarea name="scope_of_work" rows="4">{{ old('scope_of_work', $quotation->scope_of_work ?? '') }}</textarea>
-        </div>
-        <div>
-            <label>Deliverables</label>
-            <textarea name="deliverables" rows="4">{{ old('deliverables', $quotation->deliverables ?? '') }}</textarea>
-        </div>
-    </div>
-</div>
-
-<div class="card">
-    <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px;">
-        <h3 style="margin:0;color:var(--primary-dark);">Quotation Items</h3>
-        <button type="button" class="btn btn-secondary" id="add-item-btn">+ Add Item</button>
-    </div>
-
-    <div id="quotation-items-wrapper"></div>
-
-    <template id="quotation-item-template">
-        <div class="quotation-item" style="border:1px solid #e5e8eb;border-radius:12px;padding:14px;margin-bottom:12px;">
-            <div style="display:grid;grid-template-columns:2fr 1.2fr 1fr 1fr 1fr auto;gap:10px;align-items:end;">
-                <div>
-                    <label>Item Name</label>
-                    <input type="text" data-name="item_name" required>
-                </div>
-                <div>
-                    <label>Description</label>
-                    <input type="text" data-name="description">
-                </div>
-                <div>
-                    <label>Quantity</label>
-                    <input type="number" min="0.01" step="0.01" data-name="quantity" class="calc-field" required>
-                </div>
-                <div>
-                    <label>Unit Price</label>
-                    <input type="number" min="0" step="0.01" data-name="unit_price" class="calc-field" required>
-                </div>
-                <div>
-                    <label>Total</label>
-                    <input type="number" min="0" step="0.01" data-name="total_price" class="line-total" readonly>
-                </div>
-                <button type="button" class="btn remove-item-btn" style="background:#dc3545;">Delete</button>
+        <div class="quotation-grid quotation-grid-two">
+            <div class="quotation-field">
+                <label for="quotation-client-name">Client Name</label>
+                <input id="quotation-client-name" class="quotation-input @error('client_name') is-invalid @enderror" type="text" name="client_name" value="{{ old('client_name', $quotation->client_name ?? '') }}" required>
+                @error('client_name')
+                    <small class="quotation-error">{{ $message }}</small>
+                @enderror
+            </div>
+            <div class="quotation-field">
+                <label for="quotation-client-email">Client Email</label>
+                <input id="quotation-client-email" class="quotation-input @error('client_email') is-invalid @enderror" type="email" name="client_email" value="{{ old('client_email', $quotation->client_email ?? '') }}" required>
+                @error('client_email')
+                    <small class="quotation-error">{{ $message }}</small>
+                @enderror
+            </div>
+            <div class="quotation-field">
+                <label for="quotation-client-phone">Client Phone</label>
+                <input id="quotation-client-phone" class="quotation-input @error('client_phone') is-invalid @enderror" type="text" name="client_phone" value="{{ old('client_phone', $quotation->client_phone ?? '') }}">
+                @error('client_phone')
+                    <small class="quotation-error">{{ $message }}</small>
+                @enderror
+            </div>
+            <div class="quotation-field">
+                <label for="quotation-timeline">Timeline</label>
+                <input id="quotation-timeline" class="quotation-input @error('timeline') is-invalid @enderror" type="text" name="timeline" value="{{ old('timeline', $quotation->timeline ?? '') }}" placeholder="e.g. 4-6 weeks">
+                @error('timeline')
+                    <small class="quotation-error">{{ $message }}</small>
+                @enderror
+            </div>
+            <div class="quotation-field quotation-span-all">
+                <label for="quotation-client-address">Client Address</label>
+                <input id="quotation-client-address" class="quotation-input @error('client_address') is-invalid @enderror" type="text" name="client_address" value="{{ old('client_address', $quotation->client_address ?? '') }}">
+                @error('client_address')
+                    <small class="quotation-error">{{ $message }}</small>
+                @enderror
             </div>
         </div>
-    </template>
-</div>
+    </section>
 
-<div class="card">
-    <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;">
-        <div>
-            <label>Subtotal</label>
-            <input type="number" name="subtotal" id="subtotal" min="0" step="0.01" value="{{ old('subtotal', $quotation->subtotal ?? 0) }}" required readonly>
+    <section class="quotation-section">
+        <h3>Project Details</h3>
+        <p class="quotation-sub">Define project scope and delivery expectations before adding line items.</p>
+
+        <div class="quotation-grid quotation-grid-two">
+            <div class="quotation-field quotation-span-all">
+                <label for="quotation-project-title">Project Title</label>
+                <input id="quotation-project-title" class="quotation-input @error('project_title') is-invalid @enderror" type="text" name="project_title" value="{{ old('project_title', $quotation->project_title ?? '') }}" required>
+                @error('project_title')
+                    <small class="quotation-error">{{ $message }}</small>
+                @enderror
+            </div>
+            <div class="quotation-field quotation-span-all">
+                <label for="quotation-description">Description</label>
+                <textarea id="quotation-description" class="quotation-input @error('description') is-invalid @enderror" name="description" rows="3">{{ old('description', $quotation->description ?? '') }}</textarea>
+                @error('description')
+                    <small class="quotation-error">{{ $message }}</small>
+                @enderror
+            </div>
+            <div class="quotation-field">
+                <label for="quotation-scope">Scope of Work</label>
+                <textarea id="quotation-scope" class="quotation-input @error('scope_of_work') is-invalid @enderror" name="scope_of_work" rows="4">{{ old('scope_of_work', $quotation->scope_of_work ?? '') }}</textarea>
+                @error('scope_of_work')
+                    <small class="quotation-error">{{ $message }}</small>
+                @enderror
+            </div>
+            <div class="quotation-field">
+                <label for="quotation-deliverables">Deliverables</label>
+                <textarea id="quotation-deliverables" class="quotation-input @error('deliverables') is-invalid @enderror" name="deliverables" rows="4">{{ old('deliverables', $quotation->deliverables ?? '') }}</textarea>
+                @error('deliverables')
+                    <small class="quotation-error">{{ $message }}</small>
+                @enderror
+            </div>
         </div>
-        <div>
-            <label>Tax</label>
-            <input type="number" name="tax" id="tax" min="0" step="0.01" value="{{ old('tax', $quotation->tax ?? 0) }}">
+    </section>
+
+    <section class="quotation-section">
+        <div class="quotation-section-head">
+            <div>
+                <h3>Quotation Items</h3>
+                <p class="quotation-sub" style="margin-bottom:0;">Add billable line items and quantities for automatic totals.</p>
+            </div>
+            <button type="button" class="quotation-btn quotation-btn-secondary" id="add-item-btn">+ Add Item</button>
         </div>
-        <div>
-            <label>Total Amount</label>
-            <input type="number" name="total_amount" id="total_amount" min="0" step="0.01" value="{{ old('total_amount', $quotation->total_amount ?? 0) }}" required readonly>
+
+        <div id="quotation-items-wrapper" class="quotation-items-wrapper"></div>
+
+        <template id="quotation-item-template">
+            <article class="quotation-item">
+                <div class="quotation-item-grid">
+                    <div class="quotation-field">
+                        <label>Item Name</label>
+                        <input class="quotation-input" type="text" data-name="item_name" required>
+                    </div>
+                    <div class="quotation-field">
+                        <label>Description</label>
+                        <input class="quotation-input" type="text" data-name="description">
+                    </div>
+                    <div class="quotation-field">
+                        <label>Quantity</label>
+                        <input class="quotation-input calc-field" type="number" min="0.01" step="0.01" data-name="quantity" required>
+                    </div>
+                    <div class="quotation-field">
+                        <label>Unit Price</label>
+                        <input class="quotation-input calc-field" type="number" min="0" step="0.01" data-name="unit_price" required>
+                    </div>
+                    <div class="quotation-field">
+                        <label>Total</label>
+                        <input class="quotation-input line-total" type="number" min="0" step="0.01" data-name="total_price" readonly>
+                    </div>
+                    <button type="button" class="quotation-btn quotation-btn-danger remove-item-btn">Delete</button>
+                </div>
+            </article>
+        </template>
+    </section>
+
+    <section class="quotation-section">
+        <h3>Totals & Status</h3>
+        <p class="quotation-sub">Review final financial values before saving.</p>
+
+        <div class="quotation-grid quotation-grid-four">
+            <div class="quotation-field">
+                <label for="subtotal">Subtotal</label>
+                <input class="quotation-input @error('subtotal') is-invalid @enderror" type="number" name="subtotal" id="subtotal" min="0" step="0.01" value="{{ old('subtotal', $quotation->subtotal ?? 0) }}" required readonly>
+                @error('subtotal')
+                    <small class="quotation-error">{{ $message }}</small>
+                @enderror
+            </div>
+            <div class="quotation-field">
+                <label for="tax">Tax</label>
+                <input class="quotation-input @error('tax') is-invalid @enderror" type="number" name="tax" id="tax" min="0" step="0.01" value="{{ old('tax', $quotation->tax ?? 0) }}">
+                @error('tax')
+                    <small class="quotation-error">{{ $message }}</small>
+                @enderror
+            </div>
+            <div class="quotation-field">
+                <label for="total_amount">Total Amount</label>
+                <input class="quotation-input @error('total_amount') is-invalid @enderror" type="number" name="total_amount" id="total_amount" min="0" step="0.01" value="{{ old('total_amount', $quotation->total_amount ?? 0) }}" required readonly>
+                @error('total_amount')
+                    <small class="quotation-error">{{ $message }}</small>
+                @enderror
+            </div>
+            <div class="quotation-field">
+                <label for="quotation-status">Status</label>
+                <select id="quotation-status" class="quotation-input @error('status') is-invalid @enderror" name="status" required>
+                    @foreach(['draft' => 'Draft', 'approved' => 'Approved', 'sent' => 'Sent'] as $value => $label)
+                        <option value="{{ $value }}" {{ old('status', $quotation->status ?? 'draft') === $value ? 'selected' : '' }}>{{ $label }}</option>
+                    @endforeach
+                </select>
+                @error('status')
+                    <small class="quotation-error">{{ $message }}</small>
+                @enderror
+            </div>
         </div>
-        <div>
-            <label>Status</label>
-            <select name="status" required>
-                @foreach(['draft' => 'Draft', 'approved' => 'Approved', 'sent' => 'Sent'] as $value => $label)
-                    <option value="{{ $value }}" {{ old('status', $quotation->status ?? 'draft') === $value ? 'selected' : '' }}>{{ $label }}</option>
-                @endforeach
-            </select>
-        </div>
-    </div>
+    </section>
 </div>
 
 <script>
@@ -144,8 +192,8 @@
     const totalAmountInput = document.getElementById('total_amount');
 
     function toNumber(value) {
-        const n = parseFloat(value);
-        return Number.isFinite(n) ? n : 0;
+        const number = parseFloat(value);
+        return Number.isFinite(number) ? number : 0;
     }
 
     function recalculateTotals() {
@@ -166,8 +214,7 @@
     }
 
     function updateNames() {
-        const rows = wrapper.querySelectorAll('.quotation-item');
-        rows.forEach((row, index) => {
+        wrapper.querySelectorAll('.quotation-item').forEach((row, index) => {
             row.querySelectorAll('[data-name]').forEach((input) => {
                 input.name = `items[${index}][${input.dataset.name}]`;
             });
@@ -189,11 +236,12 @@
         });
 
         row.querySelector('.remove-item-btn').addEventListener('click', () => {
-            if (wrapper.querySelectorAll('.quotation-item').length > 1) {
-                row.remove();
-                updateNames();
-                recalculateTotals();
+            if (wrapper.querySelectorAll('.quotation-item').length <= 1) {
+                return;
             }
+            row.remove();
+            updateNames();
+            recalculateTotals();
         });
 
         wrapper.appendChild(row);

@@ -149,7 +149,7 @@ class CartController extends Controller
         $orderNumber = 'ORD-' . now()->format('YmdHis') . '-' . random_int(100, 999);
 
         $order = DB::transaction(function () use ($data, $cart, $total, $orderNumber, $totals) {
-            $createdOrder = Order::create([
+            $payload = [
                 'order_number' => $orderNumber,
                 'user_id' => auth()->id(),
                 'customer_name' => $data['customer_name'],
@@ -161,7 +161,19 @@ class CartController extends Controller
                 'payment_method' => $data['payment_method'],
                 'payment_status' => 'pending',
                 'total_amount' => $total,
-            ]);
+            ];
+
+            if (Schema::hasColumn('orders', 'source')) {
+                $payload['source'] = 'online';
+            }
+            if (Schema::hasColumn('orders', 'discount_amount')) {
+                $payload['discount_amount'] = $totals['discount'] ?? 0;
+            }
+            if (Schema::hasColumn('orders', 'coupon_code')) {
+                $payload['coupon_code'] = $totals['coupon_code'] ?? null;
+            }
+
+            $createdOrder = Order::create($payload);
 
             $payment = app(PaymentGatewayService::class)->initialize($createdOrder);
             $createdOrder->update([

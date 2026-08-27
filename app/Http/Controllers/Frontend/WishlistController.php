@@ -12,7 +12,7 @@ class WishlistController extends Controller
     public function index()
     {
         $items = WishlistItem::query()
-            ->with('product')
+            ->with('product.category')
             ->where('user_id', auth()->id())
             ->latest()
             ->paginate(20);

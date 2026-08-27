@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Permission;
+use App\Support\PermissionCatalog;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 
@@ -11,8 +12,14 @@ class PermissionController extends Controller
 {
     public function index()
     {
-        $permissions = Permission::with('roles')->latest()->paginate(12);
-        return view('admin.permission.index', compact('permissions'));
+        $permissions = Permission::query()->orderBy('name')->paginate(12);
+        $catalogNames = PermissionCatalog::names();
+
+        return view('admin.permission.index', [
+            'permissions' => $permissions,
+            'permissionGroups' => PermissionCatalog::grouped(),
+            'uncataloguedCount' => Permission::query()->whereNotIn('name', $catalogNames)->count(),
+        ]);
     }
 
     public function create()
@@ -29,7 +36,7 @@ class PermissionController extends Controller
 
         Permission::create([
             'name' => $data['name'],
-            'slug' => Str::slug($data['name']),
+            'slug' => Str::slug($data['name'], '_'),
             'description' => $data['description'] ?? null,
         ]);
 
@@ -44,13 +51,13 @@ class PermissionController extends Controller
     public function update(Request $request, Permission $permission)
     {
         $data = $request->validate([
-            'name' => 'required|string|max:255|unique:permissions,name,' . $permission->id,
+            'name' => 'required|string|max:255|unique:permissions,name,'.$permission->id,
             'description' => 'nullable|string|max:1000',
         ]);
 
         $permission->update([
             'name' => $data['name'],
-            'slug' => Str::slug($data['name']),
+            'slug' => Str::slug($data['name'], '_'),
             'description' => $data['description'] ?? null,
         ]);
 
