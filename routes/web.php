@@ -47,7 +47,22 @@ use App\Http\Controllers\Frontend\WishlistController;
 use App\Http\Controllers\Frontend\ProductReviewController;
 use App\Http\Controllers\Frontend\ProductQuestionController;
 use App\Http\Controllers\Frontend\PaymentController;
+use App\Http\Controllers\ManifestController;
 use Illuminate\Support\Facades\Route;
+
+Route::get('/manifest.webmanifest', [ManifestController::class, 'storefront'])->name('pwa.manifest');
+Route::get('/admin/manifest.webmanifest', [ManifestController::class, 'admin'])->name('pwa.manifest.admin');
+Route::get('/sw.js', function () {
+    if (! config('pwa.enabled', true)) {
+        abort(404);
+    }
+
+    return response()
+        ->view('pwa.service-worker')
+        ->header('Content-Type', 'application/javascript; charset=UTF-8')
+        ->header('Service-Worker-Allowed', '/')
+        ->header('Cache-Control', 'no-cache, no-store, must-revalidate');
+})->name('pwa.service-worker');
 
 Route::middleware(['web'])->group(function () {
     Route::get('/', [HomeController::class, 'index'])->name('home');

@@ -12,10 +12,10 @@ YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
 # Configuration
-APP_PATH="/var/www/elgon-tech"
-REPO_URL="your-repository-url"
+APP_PATH="/var/www/carenels-collection"
+REPO_URL="https://github.com/levimateba/Carenels-Collection.git"
 BRANCH="main"
-BACKUP_DIR="/var/backups/elgon-tech"
+BACKUP_DIR="/var/backups/carenels-collection"
 
 # Functions
 print_header() {

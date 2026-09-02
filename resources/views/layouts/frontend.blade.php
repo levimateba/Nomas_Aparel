@@ -4,6 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>@yield('title', $settings->site_name ?? 'Website')</title>
+    @include('partials.pwa-head', ['pwaContext' => 'storefront'])
     <link rel="stylesheet" href="{{ asset('css/app.css') }}" />
     <!-- Google Web Fonts -->
     <link rel="preconnect" href="https://fonts.gstatic.com">
@@ -818,5 +819,6 @@
             initializeServiceTabs();
         });
     </script>
+    @include('partials.pwa-install')
 </body>
 </html>
