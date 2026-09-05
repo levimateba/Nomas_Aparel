@@ -819,6 +819,5 @@
             initializeServiceTabs();
         });
     </script>
-    @include('partials.pwa-install')
 </body>
 </html>

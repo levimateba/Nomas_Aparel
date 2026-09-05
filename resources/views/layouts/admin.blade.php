@@ -36,7 +36,6 @@
             Alpine.store('sidebar', {
                 isExpanded: true,
                 isMobileOpen: false,
-                isHovered: false,
                 init() {
                     const savedState = localStorage.getItem('sidebarExpanded');
                     if (window.innerWidth >= 1280) {
@@ -44,16 +43,26 @@
                     } else {
                         this.isExpanded = false;
                     }
+                    this.syncHtmlState();
                     window.addEventListener('resize', () => this.handleResize());
+                    // Allow CSS transitions after first paint sync
+                    requestAnimationFrame(() => {
+                        document.documentElement.classList.remove('sidebar-booting');
+                    });
+                },
+                syncHtmlState() {
+                    document.documentElement.dataset.sidebar = this.isExpanded ? 'expanded' : 'collapsed';
                 },
                 handleResize() {
                     if (window.innerWidth < 1280) {
                         this.isMobileOpen = false;
+                        this.isExpanded = false;
                     } else {
                         this.isMobileOpen = false;
                         const savedState = localStorage.getItem('sidebarExpanded');
                         this.isExpanded = savedState === null ? true : savedState === 'true';
                     }
+                    this.syncHtmlState();
                 },
                 toggleExpanded() {
                     this.isExpanded = !this.isExpanded;
@@ -61,14 +70,10 @@
                     if (window.innerWidth >= 1280) {
                         localStorage.setItem('sidebarExpanded', this.isExpanded);
                     }
+                    this.syncHtmlState();
                 },
                 toggleMobileOpen() {
                     this.isMobileOpen = !this.isMobileOpen;
-                },
-                setHovered(val) {
-                    if (window.innerWidth >= 1280 && !this.isExpanded) {
-                        this.isHovered = val;
-                    }
                 }
             });
         });
@@ -78,8 +83,50 @@
             if (localStorage.getItem('theme') === 'dark') {
                 document.documentElement.classList.add('dark');
             }
+            // Avoid desktop sidebar width flash before Alpine boots
+            try {
+                var saved = localStorage.getItem('sidebarExpanded');
+                var expanded = saved === null ? true : saved === 'true';
+                document.documentElement.dataset.sidebar = expanded ? 'expanded' : 'collapsed';
+            } catch (e) {
+                document.documentElement.dataset.sidebar = 'expanded';
+            }
+            document.documentElement.classList.add('sidebar-booting');
+            window.addEventListener('load', function () {
+                document.documentElement.classList.remove('sidebar-booting');
+            });
         })();
     </script>
+    <style>
+        /* Match final desktop sidebar size before Alpine applies .sidebar-expanded */
+        @media (min-width: 1280px) {
+            html.sidebar-booting #sidebar,
+            html.sidebar-booting #admin-main {
+                transition: none !important;
+            }
+            html[data-sidebar="expanded"] #sidebar {
+                min-width: 290px;
+                width: 290px;
+            }
+            html[data-sidebar="expanded"] #admin-main {
+                margin-left: 290px;
+            }
+            html[data-sidebar="collapsed"] #sidebar {
+                width: 90px;
+                min-width: 90px;
+            }
+            html[data-sidebar="collapsed"] #admin-main {
+                margin-left: 90px;
+            }
+        }
+        /* Keep mobile drawer off-screen before Alpine (no black flash) */
+        @media (max-width: 1279.98px) {
+            html.sidebar-booting #sidebar {
+                transform: translateX(-100%);
+                transition: none !important;
+            }
+        }
+    </style>
     @stack('styles')
 </head>
 <body class="font-outfit">
@@ -148,16 +195,17 @@
 
 <div class="min-h-screen xl:flex"
      x-data
-     :class="{ 'sidebar-expanded': $store.sidebar.isExpanded || $store.sidebar.isHovered || $store.sidebar.isMobileOpen }">
+     :class="{ 'sidebar-expanded': $store.sidebar.isExpanded || $store.sidebar.isMobileOpen }">
     <div
-        :class="$store.sidebar.isMobileOpen ? 'block xl:hidden' : 'hidden'"
-        class="fixed z-50 h-screen w-full bg-gray-900/50"
+        x-show="$store.sidebar.isMobileOpen"
+        x-cloak
+        class="fixed inset-0 z-50 h-screen w-full bg-gray-900/50 xl:hidden"
         @click="$store.sidebar.toggleMobileOpen()"
     ></div>
 
     @include('admin.partials.tailadmin.sidebar')
 
-    <div class="flex-1 transition-all duration-300 ease-in-out ltr:xl:ml-[90px] [.sidebar-expanded_&]:ltr:xl:ml-[290px]">
+    <div class="flex-1 transition-all duration-300 ease-in-out ltr:xl:ml-[90px] [.sidebar-expanded_&]:ltr:xl:ml-[290px]" id="admin-main">
         @include('admin.partials.tailadmin.header')
 
         <div class="mx-auto max-w-(--breakpoint-2xl) p-4 md:p-6">
@@ -226,6 +274,5 @@
     });
 </script>
 @stack('scripts')
-@include('partials.pwa-install', ['pwaContext' => 'admin'])
 </body>
 </html>

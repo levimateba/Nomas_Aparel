@@ -16,6 +16,7 @@ SKIP_DIRS = {
     ".git", "node_modules", "tests", "agent-tools", "agent-transcripts",
     ".cursor", "vendor",  # lock unchanged — skip large vendor upload
     "dist",  # legacy admin assets already on server (~28MB)
+    "cache",  # never overwrite bootstrap/cache from local machine
 }
 SKIP_FILES = {
     ".env", "nomas-apparel-deploy.zip", ".DS_Store",

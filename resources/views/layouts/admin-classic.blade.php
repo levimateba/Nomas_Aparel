@@ -1050,6 +1050,5 @@
     })();
 </script>
 @stack('scripts')
-@include('partials.pwa-install', ['pwaContext' => 'admin'])
 </body>
 </html>

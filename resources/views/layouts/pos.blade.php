@@ -311,7 +311,6 @@
     @yield('content')
 </div>
 
-@include('partials.pwa-install', ['pwaContext' => 'admin'])
 <iframe id="pos-drawer-frame" title="Cash drawer" style="position:absolute;width:0;height:0;border:0;visibility:hidden;"></iframe>
 <script>
     function nomasOpenCashDrawer() {

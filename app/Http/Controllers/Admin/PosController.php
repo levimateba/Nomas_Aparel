@@ -253,6 +253,20 @@ class PosController extends Controller
             'price_mode' => ['required', 'in:retail,wholesale'],
         ]);
 
+        if ($data['price_mode'] === 'wholesale') {
+            $missing = $this->cartItemsMissingWholesale();
+            if ($missing !== []) {
+                $list = implode(', ', array_slice($missing, 0, 5));
+                if (count($missing) > 5) {
+                    $list .= ' +'.(count($missing) - 5).' more';
+                }
+
+                return back()->withErrors([
+                    'pos' => 'Wholesale price not set for: '.$list.'. Set wholesale prices on those products first, or remove them from the sale.',
+                ]);
+            }
+        }
+
         session(['pos_price_mode' => $data['price_mode']]);
         $this->repriceCart();
 
@@ -722,11 +736,12 @@ class PosController extends Controller
         $wholesaleRaw = $variant
             ? (is_numeric($variant->wholesale_price) ? (float) $variant->wholesale_price : 0.0)
             : (is_numeric($product->wholesale_price) ? (float) $product->wholesale_price : 0.0);
-        $wholesale = $wholesaleRaw > 0 ? $wholesaleRaw : $retail;
+        $hasWholesale = $wholesaleRaw > 0;
 
         return [
             'retail_price' => $retail,
-            'wholesale_price' => $wholesale,
+            'wholesale_price' => $hasWholesale ? $wholesaleRaw : null,
+            'has_wholesale' => $hasWholesale,
         ];
     }
 
@@ -734,9 +749,40 @@ class PosController extends Controller
     {
         $mode = $mode ?? $this->priceMode();
 
-        return $mode === 'wholesale'
-            ? (float) $prices['wholesale_price']
-            : (float) $prices['retail_price'];
+        if ($mode === 'wholesale') {
+            if (empty($prices['has_wholesale'])) {
+                return (float) $prices['retail_price'];
+            }
+
+            return (float) $prices['wholesale_price'];
+        }
+
+        return (float) $prices['retail_price'];
+    }
+
+    private function cartItemsMissingWholesale(): array
+    {
+        $cart = session('pos_cart', []);
+        $missing = [];
+
+        foreach ($cart as $item) {
+            $product = Product::query()->find($item['product_id'] ?? 0);
+            if (! $product) {
+                $missing[] = (string) ($item['name'] ?? 'Unknown item');
+                continue;
+            }
+
+            $variant = ! empty($item['product_variant_id'])
+                ? ProductVariant::query()->find($item['product_variant_id'])
+                : null;
+
+            $prices = $this->unitPrices($product, $variant);
+            if (! $prices['has_wholesale']) {
+                $missing[] = (string) ($item['name'] ?? $product->name);
+            }
+        }
+
+        return $missing;
     }
 
     private function repriceCart(): void
@@ -748,13 +794,24 @@ class PosController extends Controller
 
         $mode = $this->priceMode();
         foreach ($cart as $key => $item) {
-            $retail = (float) ($item['retail_price'] ?? $item['price'] ?? 0);
-            $wholesale = (float) ($item['wholesale_price'] ?? $retail);
-            $cart[$key]['retail_price'] = $retail;
-            $cart[$key]['wholesale_price'] = $wholesale > 0 ? $wholesale : $retail;
-            $cart[$key]['price'] = $mode === 'wholesale'
-                ? $cart[$key]['wholesale_price']
-                : $cart[$key]['retail_price'];
+            $product = Product::query()->find($item['product_id'] ?? 0);
+            $variant = ! empty($item['product_variant_id'])
+                ? ProductVariant::query()->find($item['product_variant_id'])
+                : null;
+
+            if ($product) {
+                $prices = $this->unitPrices($product, $variant);
+                $cart[$key]['retail_price'] = $prices['retail_price'];
+                $cart[$key]['wholesale_price'] = $prices['wholesale_price'];
+                $cart[$key]['has_wholesale'] = $prices['has_wholesale'];
+                $cart[$key]['price'] = $this->priceForMode($prices, $mode);
+            } else {
+                $retail = (float) ($item['retail_price'] ?? $item['price'] ?? 0);
+                $cart[$key]['retail_price'] = $retail;
+                $cart[$key]['price'] = $retail;
+                $cart[$key]['has_wholesale'] = false;
+                $cart[$key]['wholesale_price'] = null;
+            }
         }
 
         session(['pos_cart' => $cart]);
@@ -774,6 +831,12 @@ class PosController extends Controller
             return 'Selected variant is not available.';
         }
 
+        $prices = $this->unitPrices($product, $variant);
+        $label = $variant ? $variant->displayName() : $product->name;
+        if ($this->priceMode() === 'wholesale' && ! $prices['has_wholesale']) {
+            return 'Wholesale price not set for '.$label.'.';
+        }
+
         $allowNegative = (bool) Setting::get_settings()->allow_negative_stock;
         $stockService = app(ProductVariantService::class);
         $inventory = app(\App\Services\InventoryStockService::class);
@@ -785,7 +848,6 @@ class PosController extends Controller
         $totalElsewhere = $inventory->enabled() ? $inventory->totalQuantity($product, $variant) : $available;
 
         if (! $allowNegative && $available < 1) {
-            $label = $variant ? $variant->displayName() : $product->name;
             $locName = ($settings->pos_sell_from_all_locations ?? false)
                 ? 'POS locations'
                 : ($posLocation?->name ?? 'POS location');
@@ -809,18 +871,17 @@ class PosController extends Controller
                 ? 'POS locations'
                 : ($posLocation?->name ?? 'POS location');
 
-            return 'Only '.$available.' left at '.$locName.' for '.($variant ? $variant->displayName() : $product->name).'.';
+            return 'Only '.$available.' left at '.$locName.' for '.$label.'.';
         }
-
-        $prices = $this->unitPrices($product, $variant);
 
         $cart[$key] = [
             'product_id' => $product->id,
             'product_variant_id' => $variant?->id,
-            'name' => $variant ? $variant->displayName() : $product->name,
+            'name' => $label,
             'sku' => $variant?->sku ?: $product->sku,
             'retail_price' => $prices['retail_price'],
             'wholesale_price' => $prices['wholesale_price'],
+            'has_wholesale' => $prices['has_wholesale'],
             'price' => $this->priceForMode($prices),
             'tax_rate' => $variant && is_numeric($variant->tax_rate)
                 ? (float) $variant->tax_rate

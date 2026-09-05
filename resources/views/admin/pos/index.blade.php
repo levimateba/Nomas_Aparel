@@ -892,7 +892,7 @@
                 </form>
             </div>
             @if($priceMode === 'wholesale')
-                <small class="cs-hint">Cart prices use wholesale (falls back to retail if unset).</small>
+                <small class="cs-hint">Wholesale prices must be set on each product. Items without a wholesale price cannot be added.</small>
             @endif
         </div>
 

@@ -10,9 +10,9 @@
 @if($can('manage_products') || $can('manage_pos_categories') || $can('manage_stocktakes') || $can('manage_purchases') || $can('manage_purchase_orders') || $can('view_inventory') || $can('create_stock_transfers') || $can('adjust_stock') || $can('view_stock_movements') || $can('manage_stock_locations'))
 <div>
     <h2 class="mb-4 flex text-xs uppercase leading-[20px] text-gray-400"
-        :class="(!$store.sidebar.isExpanded && !$store.sidebar.isHovered && !$store.sidebar.isMobileOpen) ? 'justify-center' : 'justify-start'">
-        <span x-show="$store.sidebar.isExpanded || $store.sidebar.isHovered || $store.sidebar.isMobileOpen">Inventory</span>
-        <span x-show="!($store.sidebar.isExpanded || $store.sidebar.isHovered || $store.sidebar.isMobileOpen)">···</span>
+        :class="(!$store.sidebar.isExpanded && !$store.sidebar.isMobileOpen) ? 'justify-center' : 'justify-start'">
+        <span x-show="$store.sidebar.isExpanded || $store.sidebar.isMobileOpen">Inventory</span>
+        <span x-show="!($store.sidebar.isExpanded || $store.sidebar.isMobileOpen)">···</span>
     </h2>
     <ul class="flex flex-col gap-1">
         <li>
@@ -21,12 +21,12 @@
                 <span :class="open.inventory ? 'menu-item-icon-active' : 'menu-item-icon-inactive'">
                     @include('admin.partials.icon', ['name' => 'stocktake'])
                 </span>
-                <span class="menu-item-text" x-show="$store.sidebar.isExpanded || $store.sidebar.isHovered || $store.sidebar.isMobileOpen">Stock &amp; Catalog</span>
-                <svg x-show="$store.sidebar.isExpanded || $store.sidebar.isHovered || $store.sidebar.isMobileOpen"
+                <span class="menu-item-text" x-show="$store.sidebar.isExpanded || $store.sidebar.isMobileOpen">Stock &amp; Catalog</span>
+                <svg x-show="$store.sidebar.isExpanded || $store.sidebar.isMobileOpen"
                      class="ml-auto h-5 w-5 transition-transform" :class="open.inventory ? 'rotate-180 text-brand-500' : 'text-gray-400'"
                      viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
             </button>
-            <div x-show="open.inventory && ($store.sidebar.isExpanded || $store.sidebar.isHovered || $store.sidebar.isMobileOpen)" x-collapse>
+            <div x-show="open.inventory && ($store.sidebar.isExpanded || $store.sidebar.isMobileOpen)" x-collapse>
                 <ul class="mt-2 ml-9 space-y-1">
                     @if($can('manage_products'))
                     <li><a href="{{ route('admin.products.index') }}" class="{{ $submenuLink(request()->routeIs('admin.products.*')) }}">Products</a></li>
@@ -73,9 +73,9 @@
 @if($can('view_sales') || $can('process_return') || $can('create_sale') || $can('manage_coupons') || $can('manage_shifts'))
 <div>
     <h2 class="mb-4 flex text-xs uppercase leading-[20px] text-gray-400"
-        :class="(!$store.sidebar.isExpanded && !$store.sidebar.isHovered && !$store.sidebar.isMobileOpen) ? 'justify-center' : 'justify-start'">
-        <span x-show="$store.sidebar.isExpanded || $store.sidebar.isHovered || $store.sidebar.isMobileOpen">Sales</span>
-        <span x-show="!($store.sidebar.isExpanded || $store.sidebar.isHovered || $store.sidebar.isMobileOpen)">···</span>
+        :class="(!$store.sidebar.isExpanded && !$store.sidebar.isMobileOpen) ? 'justify-center' : 'justify-start'">
+        <span x-show="$store.sidebar.isExpanded || $store.sidebar.isMobileOpen">Sales</span>
+        <span x-show="!($store.sidebar.isExpanded || $store.sidebar.isMobileOpen)">···</span>
     </h2>
     <ul class="flex flex-col gap-1">
         <li>
@@ -84,12 +84,12 @@
                 <span :class="open.sales ? 'menu-item-icon-active' : 'menu-item-icon-inactive'">
                     @include('admin.partials.icon', ['name' => 'orders'])
                 </span>
-                <span class="menu-item-text" x-show="$store.sidebar.isExpanded || $store.sidebar.isHovered || $store.sidebar.isMobileOpen">Sales Desk</span>
-                <svg x-show="$store.sidebar.isExpanded || $store.sidebar.isHovered || $store.sidebar.isMobileOpen"
+                <span class="menu-item-text" x-show="$store.sidebar.isExpanded || $store.sidebar.isMobileOpen">Sales Desk</span>
+                <svg x-show="$store.sidebar.isExpanded || $store.sidebar.isMobileOpen"
                      class="ml-auto h-5 w-5 transition-transform" :class="open.sales ? 'rotate-180 text-brand-500' : 'text-gray-400'"
                      viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
             </button>
-            <div x-show="open.sales && ($store.sidebar.isExpanded || $store.sidebar.isHovered || $store.sidebar.isMobileOpen)" x-collapse>
+            <div x-show="open.sales && ($store.sidebar.isExpanded || $store.sidebar.isMobileOpen)" x-collapse>
                 <ul class="mt-2 ml-9 space-y-1">
                     @if($can('create_sale'))
                     <li><a href="{{ route('admin.holds.index') }}" class="{{ $submenuLink(request()->routeIs('admin.holds.*')) }}">Hold Sales</a></li>
@@ -120,9 +120,9 @@
 @if($can('manage_customers') || $can('manage_employees') || $can('manage_suppliers') || $can('manage_vendors') || $can('manage_loyalty'))
 <div>
     <h2 class="mb-4 flex text-xs uppercase leading-[20px] text-gray-400"
-        :class="(!$store.sidebar.isExpanded && !$store.sidebar.isHovered && !$store.sidebar.isMobileOpen) ? 'justify-center' : 'justify-start'">
-        <span x-show="$store.sidebar.isExpanded || $store.sidebar.isHovered || $store.sidebar.isMobileOpen">Partners</span>
-        <span x-show="!($store.sidebar.isExpanded || $store.sidebar.isHovered || $store.sidebar.isMobileOpen)">···</span>
+        :class="(!$store.sidebar.isExpanded && !$store.sidebar.isMobileOpen) ? 'justify-center' : 'justify-start'">
+        <span x-show="$store.sidebar.isExpanded || $store.sidebar.isMobileOpen">Partners</span>
+        <span x-show="!($store.sidebar.isExpanded || $store.sidebar.isMobileOpen)">···</span>
     </h2>
     <ul class="flex flex-col gap-1">
         <li>
@@ -131,12 +131,12 @@
                 <span :class="open.partners ? 'menu-item-icon-active' : 'menu-item-icon-inactive'">
                     @include('admin.partials.icon', ['name' => 'customers'])
                 </span>
-                <span class="menu-item-text" x-show="$store.sidebar.isExpanded || $store.sidebar.isHovered || $store.sidebar.isMobileOpen">People</span>
-                <svg x-show="$store.sidebar.isExpanded || $store.sidebar.isHovered || $store.sidebar.isMobileOpen"
+                <span class="menu-item-text" x-show="$store.sidebar.isExpanded || $store.sidebar.isMobileOpen">People</span>
+                <svg x-show="$store.sidebar.isExpanded || $store.sidebar.isMobileOpen"
                      class="ml-auto h-5 w-5 transition-transform" :class="open.partners ? 'rotate-180 text-brand-500' : 'text-gray-400'"
                      viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
             </button>
-            <div x-show="open.partners && ($store.sidebar.isExpanded || $store.sidebar.isHovered || $store.sidebar.isMobileOpen)" x-collapse>
+            <div x-show="open.partners && ($store.sidebar.isExpanded || $store.sidebar.isMobileOpen)" x-collapse>
                 <ul class="mt-2 ml-9 space-y-1">
                     @if($can('manage_employees'))
                     <li><a href="{{ route('admin.employees.index') }}" class="{{ $submenuLink(request()->routeIs('admin.employees.*')) }}">Employees</a></li>
@@ -170,7 +170,7 @@
                 <span class="{{ request()->routeIs('admin.expenses.*') ? 'menu-item-icon-active' : 'menu-item-icon-inactive' }}">
                     @include('admin.partials.icon', ['name' => 'reports'])
                 </span>
-                <span class="menu-item-text" x-show="$store.sidebar.isExpanded || $store.sidebar.isHovered || $store.sidebar.isMobileOpen">Expenses</span>
+                <span class="menu-item-text" x-show="$store.sidebar.isExpanded || $store.sidebar.isMobileOpen">Expenses</span>
             </a>
         </li>
     </ul>
@@ -180,9 +180,9 @@
 @if($can('view_pos_reports'))
 <div>
     <h2 class="mb-4 flex text-xs uppercase leading-[20px] text-gray-400"
-        :class="(!$store.sidebar.isExpanded && !$store.sidebar.isHovered && !$store.sidebar.isMobileOpen) ? 'justify-center' : 'justify-start'">
-        <span x-show="$store.sidebar.isExpanded || $store.sidebar.isHovered || $store.sidebar.isMobileOpen">Reports</span>
-        <span x-show="!($store.sidebar.isExpanded || $store.sidebar.isHovered || $store.sidebar.isMobileOpen)">···</span>
+        :class="(!$store.sidebar.isExpanded && !$store.sidebar.isMobileOpen) ? 'justify-center' : 'justify-start'">
+        <span x-show="$store.sidebar.isExpanded || $store.sidebar.isMobileOpen">Reports</span>
+        <span x-show="!($store.sidebar.isExpanded || $store.sidebar.isMobileOpen)">···</span>
     </h2>
     <ul class="flex flex-col gap-1">
         <li>
@@ -191,12 +191,12 @@
                 <span :class="open.reports ? 'menu-item-icon-active' : 'menu-item-icon-inactive'">
                     @include('admin.partials.icon', ['name' => 'reports'])
                 </span>
-                <span class="menu-item-text" x-show="$store.sidebar.isExpanded || $store.sidebar.isHovered || $store.sidebar.isMobileOpen">Analytics</span>
-                <svg x-show="$store.sidebar.isExpanded || $store.sidebar.isHovered || $store.sidebar.isMobileOpen"
+                <span class="menu-item-text" x-show="$store.sidebar.isExpanded || $store.sidebar.isMobileOpen">Analytics</span>
+                <svg x-show="$store.sidebar.isExpanded || $store.sidebar.isMobileOpen"
                      class="ml-auto h-5 w-5 transition-transform" :class="open.reports ? 'rotate-180 text-brand-500' : 'text-gray-400'"
                      viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
             </button>
-            <div x-show="open.reports && ($store.sidebar.isExpanded || $store.sidebar.isHovered || $store.sidebar.isMobileOpen)" x-collapse>
+            <div x-show="open.reports && ($store.sidebar.isExpanded || $store.sidebar.isMobileOpen)" x-collapse>
                 <ul class="mt-2 ml-9 space-y-1">
                     <li><a href="{{ route('admin.reports.index') }}" class="{{ $submenuLink(request()->routeIs('admin.reports.index') && ! request()->filled('preset')) }}">Sales &amp; Inventory</a></li>
                     <li><a href="{{ route('admin.reports.stock-valuation') }}" class="{{ $submenuLink(request()->routeIs('admin.reports.stock-valuation*')) }}">Stock Valuation</a></li>
@@ -214,9 +214,9 @@
 @if($can('view_users') || $can('view_roles') || $can('view_permissions') || $can('view_user_groups') || $can('manage_user_groups') || $can('backup_database') || $can('restore_database') || $can('view_audit_logs'))
 <div>
     <h2 class="mb-4 flex text-xs uppercase leading-[20px] text-gray-400"
-        :class="(!$store.sidebar.isExpanded && !$store.sidebar.isHovered && !$store.sidebar.isMobileOpen) ? 'justify-center' : 'justify-start'">
-        <span x-show="$store.sidebar.isExpanded || $store.sidebar.isHovered || $store.sidebar.isMobileOpen">Admin</span>
-        <span x-show="!($store.sidebar.isExpanded || $store.sidebar.isHovered || $store.sidebar.isMobileOpen)">···</span>
+        :class="(!$store.sidebar.isExpanded && !$store.sidebar.isMobileOpen) ? 'justify-center' : 'justify-start'">
+        <span x-show="$store.sidebar.isExpanded || $store.sidebar.isMobileOpen">Admin</span>
+        <span x-show="!($store.sidebar.isExpanded || $store.sidebar.isMobileOpen)">···</span>
     </h2>
     <ul class="flex flex-col gap-1">
         <li>
@@ -225,12 +225,12 @@
                 <span :class="open.admin ? 'menu-item-icon-active' : 'menu-item-icon-inactive'">
                     @include('admin.partials.icon', ['name' => 'roles'])
                 </span>
-                <span class="menu-item-text" x-show="$store.sidebar.isExpanded || $store.sidebar.isHovered || $store.sidebar.isMobileOpen">Administration</span>
-                <svg x-show="$store.sidebar.isExpanded || $store.sidebar.isHovered || $store.sidebar.isMobileOpen"
+                <span class="menu-item-text" x-show="$store.sidebar.isExpanded || $store.sidebar.isMobileOpen">Administration</span>
+                <svg x-show="$store.sidebar.isExpanded || $store.sidebar.isMobileOpen"
                      class="ml-auto h-5 w-5 transition-transform" :class="open.admin ? 'rotate-180 text-brand-500' : 'text-gray-400'"
                      viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
             </button>
-            <div x-show="open.admin && ($store.sidebar.isExpanded || $store.sidebar.isHovered || $store.sidebar.isMobileOpen)" x-collapse>
+            <div x-show="open.admin && ($store.sidebar.isExpanded || $store.sidebar.isMobileOpen)" x-collapse>
                 <ul class="mt-2 ml-9 space-y-1">
                     @if($can('view_users'))
                     <li><a href="{{ route('admin.users.index') }}" class="{{ $submenuLink(request()->routeIs('admin.users.*')) }}">Users</a></li>
@@ -266,12 +266,12 @@
                 <span :class="open.settings ? 'menu-item-icon-active' : 'menu-item-icon-inactive'">
                     @include('admin.partials.icon', ['name' => 'settings'])
                 </span>
-                <span class="menu-item-text" x-show="$store.sidebar.isExpanded || $store.sidebar.isHovered || $store.sidebar.isMobileOpen">Settings</span>
-                <svg x-show="$store.sidebar.isExpanded || $store.sidebar.isHovered || $store.sidebar.isMobileOpen"
+                <span class="menu-item-text" x-show="$store.sidebar.isExpanded || $store.sidebar.isMobileOpen">Settings</span>
+                <svg x-show="$store.sidebar.isExpanded || $store.sidebar.isMobileOpen"
                      class="ml-auto h-5 w-5 transition-transform" :class="open.settings ? 'rotate-180 text-brand-500' : 'text-gray-400'"
                      viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
             </button>
-            <div x-show="open.settings && ($store.sidebar.isExpanded || $store.sidebar.isHovered || $store.sidebar.isMobileOpen)" x-collapse>
+            <div x-show="open.settings && ($store.sidebar.isExpanded || $store.sidebar.isMobileOpen)" x-collapse>
                 <ul class="mt-2 ml-9 space-y-1">
                     @if($can('manage_system_settings'))
                     <li><a href="{{ route('admin.settings.edit') }}" class="{{ $submenuLink(request()->routeIs('admin.settings.*')) }}">Store Settings</a></li>
@@ -295,7 +295,7 @@
                 <span class="{{ request()->routeIs('admin.profile.*') ? 'menu-item-icon-active' : 'menu-item-icon-inactive' }}">
                     @include('admin.partials.icon', ['name' => 'settings'])
                 </span>
-                <span class="menu-item-text" x-show="$store.sidebar.isExpanded || $store.sidebar.isHovered || $store.sidebar.isMobileOpen">Profile</span>
+                <span class="menu-item-text" x-show="$store.sidebar.isExpanded || $store.sidebar.isMobileOpen">Profile</span>
             </a>
         </li>
     </ul>
@@ -311,12 +311,12 @@
                 <span :class="open.cms ? 'menu-item-icon-active' : 'menu-item-icon-inactive'">
                     @include('admin.partials.icon', ['name' => 'blog'])
                 </span>
-                <span class="menu-item-text" x-show="$store.sidebar.isExpanded || $store.sidebar.isHovered || $store.sidebar.isMobileOpen">Website</span>
-                <svg x-show="$store.sidebar.isExpanded || $store.sidebar.isHovered || $store.sidebar.isMobileOpen"
+                <span class="menu-item-text" x-show="$store.sidebar.isExpanded || $store.sidebar.isMobileOpen">Website</span>
+                <svg x-show="$store.sidebar.isExpanded || $store.sidebar.isMobileOpen"
                      class="ml-auto h-5 w-5 transition-transform" :class="open.cms ? 'rotate-180 text-brand-500' : 'text-gray-400'"
                      viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
             </button>
-            <div x-show="open.cms && ($store.sidebar.isExpanded || $store.sidebar.isHovered || $store.sidebar.isMobileOpen)" x-collapse>
+            <div x-show="open.cms && ($store.sidebar.isExpanded || $store.sidebar.isMobileOpen)" x-collapse>
                 <ul class="mt-2 ml-9 space-y-1">
                     @if($can('manage_blog'))
                     <li><a href="{{ route('admin.blog.index') }}" class="{{ $submenuLink(request()->routeIs('admin.blog.*')) }}">Blog</a></li>

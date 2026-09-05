@@ -314,8 +314,9 @@
   }
 }
 
+/* Hover expand disabled — sidebar width toggles only via hamburger */
 .sidebar:hover {
-  width: 290px;
+  width: inherit;
 }
 .sidebar:hover .logo {
   display: block;
