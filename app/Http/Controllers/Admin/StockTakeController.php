@@ -8,6 +8,7 @@ use App\Models\Product;
 use App\Models\StockTake;
 use App\Models\Vendor;
 use App\Services\StockTakeService;
+use App\Support\Audit;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -57,6 +58,8 @@ class StockTakeController extends Controller
 
         $take = $stockTakes->create($data);
 
+        Audit::log('stocktake_created', 'Created stocktake '.$take->stocktake_number, $take, [], 'inventory');
+
         return redirect()
             ->route('admin.stock-takes.show', $take)
             ->with('success', 'Stock take created. Enter physical counts — stock will not change until approval.');
@@ -66,24 +69,77 @@ class StockTakeController extends Controller
     {
         $stockTake->load(['user', 'completedByUser', 'category', 'vendor']);
 
-        $query = trim((string) $request->input('q', ''));
-        if ($query !== '' && $stockTake->isEditable()) {
-            $product = Product::findActiveByScan($query);
+        // Exact barcode / SKU scan increments count by 1
+        $scan = trim((string) $request->input('scan', ''));
+        if ($scan !== '' && $stockTake->isEditable()) {
+            $product = Product::query()
+                ->where('is_active', true)
+                ->where(function ($q) use ($scan) {
+                    $q->where('sku', $scan);
+                    if (\Illuminate\Support\Facades\Schema::hasColumn('products', 'barcode')) {
+                        $q->orWhere('barcode', $scan);
+                    }
+                    if (\Illuminate\Support\Facades\Schema::hasTable('product_barcodes')) {
+                        $q->orWhereHas('additionalBarcodes', fn ($b) => $b->where('barcode', $scan));
+                    }
+                })
+                ->first();
+
             if ($product) {
                 $item = $stockTakes->addOrIncrement($stockTake, $product);
 
                 return redirect()
-                    ->route('admin.stock-takes.show', $stockTake)
-                    ->with('success', $item->product_name . ' counted as ' . $item->counted_qty . '.');
+                    ->route('admin.stock-takes.show', [
+                        'stockTake' => $stockTake,
+                        'q' => $request->input('q'),
+                        'filter' => $request->input('filter', 'all'),
+                        'highlight' => $item->id,
+                    ])
+                    ->with('success', $item->product_name.' counted as '.$item->counted_qty.'.');
             }
+
+            return redirect()
+                ->route('admin.stock-takes.show', [
+                    'stockTake' => $stockTake,
+                    'q' => $scan,
+                    'filter' => $request->input('filter', 'all'),
+                ])
+                ->with('error', 'No exact SKU/barcode match for “'.$scan.'”. Showing search results instead.');
         }
 
         $stockTake->load('items');
         $items = $stockTake->items->sortBy('product_name')->values();
-        $positiveQty = (int) $items->where('variance', '>', 0)->sum('variance');
-        $negativeQty = (int) $items->where('variance', '<', 0)->sum('variance');
 
-        return view('admin.stock-takes.show', compact('stockTake', 'items', 'positiveQty', 'negativeQty'));
+        $q = trim((string) $request->input('q', ''));
+        if ($q !== '') {
+            $needle = mb_strtolower($q);
+            $items = $items->filter(function ($item) use ($needle) {
+                return str_contains(mb_strtolower((string) $item->product_name), $needle)
+                    || str_contains(mb_strtolower((string) $item->sku), $needle)
+                    || str_contains(mb_strtolower((string) $item->barcode), $needle);
+            })->values();
+        }
+
+        $filter = $request->input('filter', 'all');
+        if ($filter === 'uncounted') {
+            $items = $items->filter(fn ($item) => ! $item->isCounted())->values();
+        } elseif ($filter === 'counted') {
+            $items = $items->filter(fn ($item) => $item->isCounted())->values();
+        } elseif ($filter === 'variance') {
+            $items = $items->filter(fn ($item) => $item->isCounted() && (int) $item->variance !== 0)->values();
+        }
+
+        $allItems = $stockTake->items;
+        $positiveQty = (int) $allItems->where('variance', '>', 0)->sum('variance');
+        $negativeQty = (int) $allItems->where('variance', '<', 0)->sum('variance');
+        $countedCount = $allItems->filter(fn ($i) => $i->isCounted())->count();
+        $highlightId = (int) $request->input('highlight', 0);
+
+        return view('admin.stock-takes.show', compact(
+            'stockTake', 'items', 'positiveQty', 'negativeQty', 'q', 'filter', 'countedCount', 'highlightId'
+        ) + [
+            'totalItems' => $allItems->count(),
+        ]);
     }
 
     public function update(Request $request, StockTake $stockTake, StockTakeService $stockTakes): RedirectResponse
@@ -111,6 +167,8 @@ class StockTakeController extends Controller
     {
         $stockTakes->submitForReview($stockTake);
 
+        Audit::log('stocktake_review', 'Submitted stocktake '.$stockTake->stocktake_number.' for review', $stockTake, [], 'inventory');
+
         return back()->with('success', 'Stock take sent for review.');
     }
 
@@ -118,12 +176,16 @@ class StockTakeController extends Controller
     {
         $stockTakes->approve($stockTake);
 
+        Audit::log('stocktake_approved', 'Approved stocktake '.$stockTake->stocktake_number, $stockTake, [], 'inventory');
+
         return back()->with('success', 'Stock take approved. Inventory adjustments have been applied.');
     }
 
     public function cancel(StockTake $stockTake, StockTakeService $stockTakes): RedirectResponse
     {
         $stockTakes->cancel($stockTake);
+
+        Audit::log('stocktake_cancelled', 'Cancelled stocktake '.$stockTake->stocktake_number, $stockTake, [], 'inventory');
 
         return redirect()
             ->route('admin.stock-takes.index')

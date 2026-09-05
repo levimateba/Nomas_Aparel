@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Support\Audit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
@@ -37,11 +38,20 @@ class AuthController extends Controller
 
         $request->session()->regenerate();
 
-        return redirect()->intended(route('admin.dashboard'));
+        Audit::log('login', 'User logged in', $user, [], 'auth');
+
+        $home = $user->preferredAdminHomeRoute();
+
+        return redirect()->intended(route($home));
     }
 
     public function logout(Request $request)
     {
+        $user = Auth::user();
+        if ($user) {
+            Audit::log('logout', 'User logged out', $user, [], 'auth');
+        }
+
         Auth::logout();
         $request->session()->invalidate();
         $request->session()->regenerateToken();

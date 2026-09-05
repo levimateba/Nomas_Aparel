@@ -19,6 +19,8 @@ class Order extends Model
         'notes',
         'cancellation_requested_at',
         'cancellation_reason',
+        'return_requested_at',
+        'return_reason',
         'status',
         'payment_method',
         'payment_status',
@@ -26,13 +28,24 @@ class Order extends Model
         'total_amount',
         'source',
         'discount_amount',
+        'tax_amount',
         'coupon_code',
+        'stock_location_id',
+        'shop_customer_id',
+        'loyalty_points_earned',
+        'loyalty_points_redeemed',
+        'loyalty_discount_amount',
     ];
 
     protected $casts = [
         'total_amount' => 'decimal:2',
         'discount_amount' => 'decimal:2',
+        'tax_amount' => 'decimal:2',
+        'loyalty_discount_amount' => 'decimal:2',
+        'loyalty_points_earned' => 'integer',
+        'loyalty_points_redeemed' => 'integer',
         'cancellation_requested_at' => 'datetime',
+        'return_requested_at' => 'datetime',
     ];
 
     public function items(): HasMany
@@ -53,6 +66,26 @@ class Order extends Model
     public function returns(): HasMany
     {
         return $this->hasMany(OrderReturn::class);
+    }
+
+    public function stockAllocations(): HasMany
+    {
+        return $this->hasMany(OrderStockAllocation::class);
+    }
+
+    public function stockLocation(): BelongsTo
+    {
+        return $this->belongsTo(StockLocation::class, 'stock_location_id');
+    }
+
+    public function shopCustomer(): BelongsTo
+    {
+        return $this->belongsTo(ShopCustomer::class, 'shop_customer_id');
+    }
+
+    public function loyaltyTransactions(): HasMany
+    {
+        return $this->hasMany(LoyaltyTransaction::class);
     }
 
     public function isPos(): bool

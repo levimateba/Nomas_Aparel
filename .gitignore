@@ -22,3 +22,7 @@
 Homestead.json
 Homestead.yaml
 Thumbs.db
+
+# Local POS reference copies — never publish to GitHub
+/pos-system/
+/pos-system copy/

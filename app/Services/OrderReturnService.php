@@ -6,11 +6,18 @@ use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\OrderReturn;
 use App\Models\Product;
+use App\Models\ProductVariant;
+use App\Models\StockLocation;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 
 class OrderReturnService
 {
+    public function __construct(private readonly InventoryStockService $inventory)
+    {
+    }
+
     public function process(Order $order, array $payload): OrderReturn
     {
         return DB::transaction(function () use ($order, $payload) {
@@ -24,6 +31,15 @@ class OrderReturnService
             if ($lines->isEmpty()) {
                 throw ValidationException::withMessages(['items' => 'Select at least one item to return.']);
             }
+
+            $location = null;
+            if (! empty($payload['stock_location_id'])) {
+                $location = StockLocation::query()->find($payload['stock_location_id']);
+            }
+            $location ??= $order->stock_location_id
+                ? StockLocation::query()->find($order->stock_location_id)
+                : null;
+            $location ??= $this->inventory->resolvePosLocation() ?: StockLocation::shopFloor() ?: StockLocation::mainStore();
 
             $prepared = [];
             $total = 0.0;
@@ -71,11 +87,45 @@ class OrderReturnService
 
                 if ($line['orderItem']->product_id) {
                     $product = Product::query()->lockForUpdate()->find($line['orderItem']->product_id);
-                    $product?->increment('stock', $line['qty']);
+                    if (! $product) {
+                        continue;
+                    }
+
+                    $variant = null;
+                    if (Schema::hasColumn('order_items', 'product_variant_id') && $line['orderItem']->product_variant_id) {
+                        $variant = ProductVariant::query()->lockForUpdate()->find($line['orderItem']->product_variant_id);
+                    }
+
+                    if ($this->inventory->enabled() && $location) {
+                        $this->inventory->adjust(
+                            $product,
+                            $variant,
+                            $location,
+                            (int) $line['qty'],
+                            'RETURN',
+                            $payload['reason'] ?? 'Customer return',
+                            $return
+                        );
+                    } else {
+                        if ($variant) {
+                            $variant->increment('stock', $line['qty']);
+                            app(ProductVariantService::class)->deductStockLegacySync($product);
+                        } else {
+                            $product->increment('stock', $line['qty']);
+                        }
+                    }
                 }
             }
 
-            return $return->fresh(['items', 'order', 'user']);
+            $fresh = $return->fresh(['items', 'order', 'user']);
+
+            try {
+                app(LoyaltyService::class)->reversePointsForReturn($order, $fresh, (float) $total);
+            } catch (\Throwable $e) {
+                report($e);
+            }
+
+            return $fresh->fresh(['items', 'order', 'user']);
         });
     }
 }

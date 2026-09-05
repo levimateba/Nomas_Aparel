@@ -26,6 +26,32 @@
     .share-btn.facebook { background: #1877f2; color: #fff; border-color: #1877f2; }
     .share-btn.x { background: #111; color: #fff; border-color: #111; }
     .share-btn.copy { cursor: pointer; }
+    .star-rating {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        margin: 8px 0 14px;
+        flex-wrap: wrap;
+    }
+    .star-rating-stars { display: inline-flex; gap: 4px; }
+    .star-rating .star-btn {
+        width: 40px;
+        height: 40px;
+        border: 0;
+        border-radius: 10px;
+        background: #f3f4f6;
+        color: #d1d5db;
+        font-size: 22px;
+        line-height: 1;
+        cursor: pointer;
+        padding: 0;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+    .star-rating .star-btn.is-on,
+    .star-rating .star-btn.is-hover { color: #d4af37; background: #fffbeb; }
+    .star-rating-label { font-size: 13px; font-weight: 700; color: #6b7280; min-width: 48px; }
     @media (max-width: 1000px) { .related-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
     @media (max-width: 900px) { .product-layout { grid-template-columns: 1fr; } }
 </style>
@@ -37,7 +63,7 @@
         <article class="card main">
             @php $inWishlist = in_array((int) $product->id, array_map('intval', $wishlistIds ?? []), true); @endphp
             <div class="p-card-media" style="margin-bottom:12px;">
-                <div class="p-card-img" style="height:320px;border-radius:10px;background-image:url('{{ $product->image_url ?: 'https://via.placeholder.com/900x500?text=Product' }}');"></div>
+                <div class="p-card-img" style="height:320px;border-radius:10px;background-image:url('{{ $product->displayImageUrl() }}');"></div>
                 @if($product->hasSale())
                     <span class="p-disc">-{{ $product->discountPercent() }}%</span>
                 @endif
@@ -59,11 +85,23 @@
             <div class="mini" style="margin-bottom:8px;">
                 Rating: {{ $averageRating > 0 ? $averageRating . '/5' : 'No ratings yet' }} ({{ $product->reviews->count() }} reviews)
             </div>
-            <div class="price">KES {{ number_format($product->currentPrice(), 2) }}</div>
+            <div class="price" id="product-display-price">KES {{ number_format($product->currentPrice(), 2) }}</div>
             @if($product->hasSale())
                 <div style="color:#6b7280;">Was KES {{ number_format((float) $product->price, 2) }}</div>
             @endif
+            @if($product->style)<div class="mini">Style: <strong>{{ $product->style->name }}</strong></div>@endif
+            @if($product->target_audience)<div class="mini">For: <strong>{{ \App\Models\Product::AUDIENCES[$product->target_audience] ?? $product->target_audience }}</strong></div>@endif
             <p class="desc">{{ $product->description }}</p>
+            @if($product->care_instructions)
+                <p class="mini" style="white-space:pre-line;"><strong>Care:</strong> {{ $product->care_instructions }}</p>
+            @endif
+            @if($product->specifications->count())
+                <div style="margin-top:10px;">
+                    @foreach($product->specifications as $spec)
+                        <div class="mini"><strong>{{ $spec->name }}:</strong> {{ $spec->value }}</div>
+                    @endforeach
+                </div>
+            @endif
         </article>
 
         <aside class="card side">
@@ -72,8 +110,38 @@
             <p class="mini">7-day return policy for unopened items.</p>
             <form method="POST" action="{{ route('cart.add', $product) }}">
                 @csrf
-                <button class="btn btn-primary" style="width: 100%;" type="submit">Add to Cart</button>
+                @if($product->usesVariants())
+                    <label class="mini" style="display:block;margin-bottom:6px;">Select variant</label>
+                    <select name="variant_id" id="variant-select" required style="width:100%;margin-bottom:10px;padding:10px;border-radius:8px;border:1px solid #d1d5db;">
+                        <option value="">Choose size / colour…</option>
+                        @foreach($product->activeVariants as $variant)
+                            @php $onlineQty = $onlineStockByVariant[$variant->id] ?? (int) $variant->stock; @endphp
+                            <option
+                                value="{{ $variant->id }}"
+                                data-price="{{ $variant->currentPrice() }}"
+                                data-stock="{{ $onlineQty }}"
+                                @disabled($onlineQty < 1 && !($product->allow_backorders ?? false))
+                            >
+                                {{ $variant->name }} — KES {{ number_format($variant->currentPrice(), 2) }}
+                                @if($product->display_stock) ({{ $onlineQty }} left) @endif
+                                @if($onlineQty < 1) — Out of stock @endif
+                            </option>
+                        @endforeach
+                    </select>
+                @elseif($product->display_stock)
+                    <p class="mini">Stock: {{ $onlineStockSimple ?? $product->stock }}</p>
+                @endif
+                <input type="number" name="qty" min="1" value="1" style="width:100%;margin-bottom:10px;padding:10px;border-radius:8px;border:1px solid #d1d5db;">
+                <button class="btn btn-primary" style="width: 100%;" type="submit" @disabled(!($product->allow_online_purchase ?? true))>Add to Cart</button>
             </form>
+            <script>
+            document.getElementById('variant-select')?.addEventListener('change', function () {
+                const opt = this.options[this.selectedIndex];
+                const price = opt?.dataset?.price;
+                const el = document.getElementById('product-display-price');
+                if (el && price) el.textContent = 'KES ' + Number(price).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+            });
+            </script>
             @auth
                 <form method="POST" action="{{ $inWishlist ? route('wishlist.destroy', $product) : route('wishlist.store', $product) }}" style="margin-top:8px;">
                     @csrf
@@ -108,17 +176,20 @@
         <h2 style="margin-top: 18px;">Customer Reviews</h2>
         <div class="card" style="padding: 14px; margin-bottom: 16px;">
             @auth
-                <form method="POST" action="{{ route('shop.reviews.store', $product) }}">
+                <form method="POST" action="{{ route('shop.reviews.store', $product) }}" id="review-form">
                     @csrf
                     <label>Rating</label>
-                    <select name="rating" required style="width:100%;padding:10px;border:1px solid #d1d5db;border-radius:8px;margin-bottom:8px;">
-                        <option value="">Select rating</option>
-                        @for($i=5;$i>=1;$i--)
-                            <option value="{{ $i }}">{{ $i }} / 5</option>
-                        @endfor
-                    </select>
+                    <input type="hidden" name="rating" id="review-rating" value="{{ old('rating') }}" required>
+                    <div class="star-rating" id="star-rating" role="radiogroup" aria-label="Select rating">
+                        <div class="star-rating-stars">
+                            @for($i = 1; $i <= 5; $i++)
+                                <button type="button" class="star-btn" data-value="{{ $i }}" aria-label="{{ $i }} star{{ $i > 1 ? 's' : '' }}">★</button>
+                            @endfor
+                        </div>
+                        <span class="star-rating-label" id="star-rating-label">Tap a star</span>
+                    </div>
                     <label>Comment</label>
-                    <textarea name="comment" rows="3" required style="width:100%;padding:10px;border:1px solid #d1d5db;border-radius:8px;margin-bottom:8px;"></textarea>
+                    <textarea name="comment" rows="3" required style="width:100%;padding:10px;border:1px solid #d1d5db;border-radius:8px;margin-bottom:8px;">{{ old('comment') }}</textarea>
                     <button type="submit" class="btn btn-primary">Submit Review</button>
                 </form>
             @else
@@ -194,5 +265,53 @@
             }
         });
     });
+
+    (function () {
+        var wrap = document.getElementById('star-rating');
+        var input = document.getElementById('review-rating');
+        var label = document.getElementById('star-rating-label');
+        var form = document.getElementById('review-form');
+        if (!wrap || !input) return;
+
+        var buttons = Array.prototype.slice.call(wrap.querySelectorAll('.star-btn'));
+        var selected = parseInt(input.value, 10) || 0;
+
+        function paint(value, hover) {
+            buttons.forEach(function (btn) {
+                var n = parseInt(btn.getAttribute('data-value'), 10);
+                btn.classList.toggle('is-on', n <= value);
+                btn.classList.toggle('is-hover', hover ? n <= hover : false);
+            });
+            if (label) {
+                label.textContent = value > 0 ? (value + ' / 5') : 'Tap a star';
+            }
+        }
+
+        buttons.forEach(function (btn) {
+            btn.addEventListener('mouseenter', function () {
+                paint(selected, parseInt(btn.getAttribute('data-value'), 10));
+            });
+            btn.addEventListener('mouseleave', function () {
+                paint(selected, 0);
+            });
+            btn.addEventListener('click', function () {
+                selected = parseInt(btn.getAttribute('data-value'), 10);
+                input.value = String(selected);
+                paint(selected, 0);
+            });
+        });
+
+        if (form) {
+            form.addEventListener('submit', function (e) {
+                if (!input.value) {
+                    e.preventDefault();
+                    if (label) label.textContent = 'Please select a rating';
+                    label && (label.style.color = '#dc2626');
+                }
+            });
+        }
+
+        paint(selected, 0);
+    })();
 </script>
 @endsection

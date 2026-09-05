@@ -49,48 +49,73 @@ class ManifestController extends Controller
      */
     private function manifestResponse(array $payload, Setting $settings): JsonResponse
     {
+        $version = (string) config('pwa.cache_version', '1');
+
         return response()->json(array_merge([
             'display' => 'standalone',
             'orientation' => 'portrait-primary',
-            'icons' => $this->icons($settings),
-        ], $payload))->header('Content-Type', 'application/manifest+json');
+            'icons' => $this->icons($settings, $version),
+        ], $payload))->header('Content-Type', 'application/manifest+json')
+            ->header('Cache-Control', 'no-cache, must-revalidate');
     }
 
     /**
      * @return array<int, array<string, mixed>>
      */
-    private function icons(Setting $settings): array
+    private function icons(Setting $settings, string $version): array
     {
         $icons = [];
+        $bust = '?v='.$version;
 
-        $rawLogo = method_exists($settings, 'getRawOriginal')
-            ? $settings->getRawOriginal('logo')
-            : null;
-        $logoUrl = PublicStorageUrl::fromPath($rawLogo);
+        // Prefer generated PWA PNGs (correct size + type for Android/iOS launchers).
+        foreach ([192, 512] as $size) {
+            $anyPath = public_path("pwa/icon-{$size}.png");
+            $maskPath = public_path("pwa/icon-{$size}-maskable.png");
 
-        if ($logoUrl) {
-            $absolute = $this->absoluteUrl($logoUrl);
-            $icons[] = [
-                'src' => $absolute,
-                'sizes' => '512x512',
-                'type' => 'image/png',
-                'purpose' => 'any',
-            ];
-            $icons[] = [
-                'src' => $absolute,
-                'sizes' => '192x192',
-                'type' => 'image/png',
-                'purpose' => 'any',
-            ];
+            if (is_file($anyPath)) {
+                $icons[] = [
+                    'src' => url("/pwa/icon-{$size}.png").$bust,
+                    'sizes' => "{$size}x{$size}",
+                    'type' => 'image/png',
+                    'purpose' => 'any',
+                ];
+            }
+
+            if (is_file($maskPath)) {
+                $icons[] = [
+                    'src' => url("/pwa/icon-{$size}-maskable.png").$bust,
+                    'sizes' => "{$size}x{$size}",
+                    'type' => 'image/png',
+                    'purpose' => 'maskable',
+                ];
+            } elseif (is_file($anyPath)) {
+                $icons[] = [
+                    'src' => url("/pwa/icon-{$size}.png").$bust,
+                    'sizes' => "{$size}x{$size}",
+                    'type' => 'image/png',
+                    'purpose' => 'maskable',
+                ];
+            }
         }
 
-        foreach ([192, 512] as $size) {
-            $icons[] = [
-                'src' => url("/pwa/icon-{$size}.png"),
-                'sizes' => "{$size}x{$size}",
-                'type' => 'image/png',
-                'purpose' => 'any maskable',
-            ];
+        // Fallback to uploaded site logo if generated icons are missing.
+        if ($icons === []) {
+            $rawLogo = method_exists($settings, 'getRawOriginal')
+                ? $settings->getRawOriginal('logo')
+                : null;
+            $logoUrl = PublicStorageUrl::fromPath($rawLogo);
+            if ($logoUrl) {
+                $absolute = $this->absoluteUrl($logoUrl);
+                $type = $this->guessImageType($absolute);
+                foreach (['512x512', '192x192'] as $sizes) {
+                    $icons[] = [
+                        'src' => $absolute,
+                        'sizes' => $sizes,
+                        'type' => $type,
+                        'purpose' => 'any',
+                    ];
+                }
+            }
         }
 
         return $icons;
@@ -103,5 +128,21 @@ class ManifestController extends Controller
         }
 
         return url($url);
+    }
+
+    private function guessImageType(string $url): string
+    {
+        $path = strtolower(parse_url($url, PHP_URL_PATH) ?: $url);
+        if (str_ends_with($path, '.jpg') || str_ends_with($path, '.jpeg')) {
+            return 'image/jpeg';
+        }
+        if (str_ends_with($path, '.webp')) {
+            return 'image/webp';
+        }
+        if (str_ends_with($path, '.svg')) {
+            return 'image/svg+xml';
+        }
+
+        return 'image/png';
     }
 }

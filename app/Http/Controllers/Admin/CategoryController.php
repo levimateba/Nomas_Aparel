@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Category;
+use App\Support\Audit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
@@ -37,7 +38,9 @@ class CategoryController extends Controller
         $data['slug'] = $data['slug'] ?: Str::slug($data['name']);
         $data['is_active'] = $request->boolean('is_active');
 
-        Category::create($data);
+        $category = Category::create($data);
+
+        Audit::log('category_created', 'Created category '.$category->name, $category, [], 'inventory');
 
         return redirect()->route('admin.categories.index')->with('success', 'Category created.');
     }
@@ -65,12 +68,17 @@ class CategoryController extends Controller
 
         $category->update($data);
 
+        Audit::log('category_updated', 'Updated category '.$category->name, $category, [], 'inventory');
+
         return redirect()->route('admin.categories.index')->with('success', 'Category updated.');
     }
 
     public function destroy(Category $category)
     {
+        $name = $category->name;
         $category->delete();
+
+        Audit::log('category_deleted', 'Deleted category '.$name, null, ['name' => $name], 'inventory');
 
         return redirect()->route('admin.categories.index')->with('success', 'Category removed.');
     }

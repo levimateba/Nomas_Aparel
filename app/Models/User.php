@@ -6,6 +6,7 @@ use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Str;
@@ -18,6 +19,10 @@ class User extends Authenticatable
     protected $fillable = [
         'name',
         'email',
+        'avatar',
+        'job_title',
+        'phone',
+        'employee_code',
         'password',
         'is_admin',
         'role_id',
@@ -70,8 +75,64 @@ class User extends Authenticatable
 
         return $this->allRoleNames()
             ->map(fn ($name) => Str::lower($name))
-            ->intersect(['admin', 'super admin', 'manager', 'staff', 'cashier', 'stock manager'])
-            ->isNotEmpty();
+            ->intersect(['admin', 'super admin', 'manager', 'store manager', 'staff', 'cashier', 'stock manager'])
+            ->isNotEmpty()
+            || $this->rolesCollection()->contains(fn (Role $role) => in_array($role->slug, [
+                'admin', 'super-admin', 'manager', 'staff', 'cashier', 'stock-manager',
+            ], true));
+    }
+
+    /**
+     * Front-line cashier: can sell, cannot manage catalogue/settings/inventory.
+     */
+    public function isFrontlineCashier(): bool
+    {
+        if ($this->isFullAdmin()) {
+            return false;
+        }
+
+        return $this->hasPermission('create_sale')
+            && ! $this->hasPermission('manage_products')
+            && ! $this->hasPermission('manage_system_settings')
+            && ! $this->hasPermission('view_inventory')
+            && ! $this->hasPermission('manage_purchases');
+    }
+
+    /**
+     * Stock-focused user without POS selling rights.
+     */
+    public function isStockKeeper(): bool
+    {
+        if ($this->isFullAdmin() || $this->hasPermission('create_sale')) {
+            return false;
+        }
+
+        return $this->hasPermission('view_inventory') || $this->hasPermission('manage_products');
+    }
+
+    public function preferredAdminHomeRoute(): string
+    {
+        if ($this->isFrontlineCashier()) {
+            return 'admin.cashier.home';
+        }
+
+        if ($this->isStockKeeper() && $this->hasPermission('view_inventory')) {
+            return 'admin.stock-overview.index';
+        }
+
+        if ($this->isStockKeeper() && $this->hasPermission('manage_products')) {
+            return 'admin.products.index';
+        }
+
+        if ($this->hasPermission('view_dashboard')) {
+            return 'admin.dashboard';
+        }
+
+        if ($this->hasPermission('create_sale')) {
+            return 'admin.cashier.home';
+        }
+
+        return 'admin.dashboard';
     }
 
     public function hasAnyRole(array $names): bool
@@ -90,19 +151,17 @@ class User extends Authenticatable
             return true;
         }
 
-        $matches = function ($query) use ($permission) {
-            $query->where(function ($inner) use ($permission) {
-                $inner->where('name', $permission)->orWhere('slug', $permission);
-            });
-        };
+        foreach ($this->rolesCollection() as $role) {
+            $perms = $role->relationLoaded('permissions')
+                ? $role->permissions
+                : $role->permissions()->get(['name', 'slug']);
 
-        if ($this->role && $this->role->permissions()->where($matches)->exists()) {
-            return true;
+            if ($perms->contains(fn ($p) => $p->name === $permission || $p->slug === $permission)) {
+                return true;
+            }
         }
 
-        return $this->roles()
-            ->whereHas('permissions', $matches)
-            ->exists();
+        return false;
     }
 
     public function applyRoleIds(array $roleIds): void
@@ -142,8 +201,9 @@ class User extends Authenticatable
     {
         $name = Str::lower($role->name);
 
-        return in_array($name, ['admin', 'super admin'], true)
-            || in_array($role->slug, ['admin', 'super-admin'], true);
+        // Only Super Admin bypasses permission checks. Role "Admin" uses its assigned permissions.
+        return in_array($name, ['super admin'], true)
+            || in_array($role->slug, ['super-admin'], true);
     }
 
     public function wishlistItems(): HasMany
@@ -159,5 +219,55 @@ class User extends Authenticatable
     public function cashierShifts(): HasMany
     {
         return $this->hasMany(CashierShift::class);
+    }
+
+    public function avatarStoragePath(): ?string
+    {
+        $path = method_exists($this, 'getRawOriginal')
+            ? $this->getRawOriginal('avatar')
+            : ($this->attributes['avatar'] ?? null);
+        $path = trim((string) ($path ?: ''));
+
+        return $path !== '' ? $path : null;
+    }
+
+    public function avatarUrl(): ?string
+    {
+        $path = $this->avatarStoragePath();
+        if (! $path) {
+            return null;
+        }
+
+        if (
+            str_starts_with($path, 'http://')
+            || str_starts_with($path, 'https://')
+            || str_starts_with($path, '/storage/')
+        ) {
+            return $path;
+        }
+
+        return \App\Support\PublicStorageUrl::fromPath($path);
+    }
+
+    public function initials(): string
+    {
+        return strtoupper(substr((string) $this->name, 0, 1)) ?: 'U';
+    }
+
+    public function ensureEmployeeCode(): string
+    {
+        if (filled($this->employee_code)) {
+            return (string) $this->employee_code;
+        }
+
+        $code = 'EMP-'.str_pad((string) $this->id, 4, '0', STR_PAD_LEFT);
+        $this->forceFill(['employee_code' => $code])->save();
+
+        return $code;
+    }
+
+    public function employee(): HasOne
+    {
+        return $this->hasOne(Employee::class);
     }
 }

@@ -16,6 +16,7 @@
         <button class="btn" type="submit">Login</button>
     </form>
     <div class="auth-links">
-        Don't have an account? <a href="{{ route('register') }}">Register here</a>
+        Don't have an account?
+        <a href="{{ route('register', request('redirect') === 'checkout' || str_contains((string) session('url.intended'), '/checkout') ? ['redirect' => 'checkout'] : []) }}">Create account</a>
     </div>
 @endsection

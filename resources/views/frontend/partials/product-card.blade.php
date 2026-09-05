@@ -7,7 +7,7 @@
 @endphp
 <article class="p-card">
     <div class="p-card-media">
-        <a href="{{ route('shop.show', $product) }}" class="p-card-img" style="background-image:url('{{ $product->image_url ?: 'https://via.placeholder.com/400x320?text=Product' }}');"></a>
+        <a href="{{ route('shop.show', $product) }}" class="p-card-img" style="background-image:url('{{ $product->displayImageUrl() }}');"></a>
         @if($product->hasSale())
             <span class="p-disc">-{{ $product->discountPercent() }}%</span>
         @endif
@@ -42,11 +42,11 @@
         </div>
         @if($showActions)
             <div class="p-actions">
-                <a href="{{ route('shop.show', $product) }}" class="btn btn-primary">View</a>
                 <form method="POST" action="{{ route('cart.add', $product) }}">
                     @csrf
                     <button type="submit" class="btn btn-cart">Add to Cart</button>
                 </form>
+                <a href="{{ route('shop.show', $product) }}" class="btn btn-view">View</a>
             </div>
         @endif
     </div>

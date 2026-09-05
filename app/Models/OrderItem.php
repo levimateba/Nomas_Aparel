@@ -10,7 +10,10 @@ class OrderItem extends Model
     protected $fillable = [
         'order_id',
         'product_id',
+        'product_variant_id',
         'product_name',
+        'variant_name',
+        'sku',
         'unit_price',
         'quantity',
         'returned_quantity',
@@ -30,6 +33,16 @@ class OrderItem extends Model
     public function product(): BelongsTo
     {
         return $this->belongsTo(Product::class);
+    }
+
+    public function variant(): BelongsTo
+    {
+        return $this->belongsTo(ProductVariant::class, 'product_variant_id');
+    }
+
+    public function stockAllocations(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(OrderStockAllocation::class);
     }
 
     public function returnableQuantity(): int

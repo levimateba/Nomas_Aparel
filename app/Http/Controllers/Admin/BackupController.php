@@ -13,12 +13,28 @@ class BackupController extends Controller
     {
         Storage::makeDirectory('backups');
 
+        $backups = collect(Storage::files('backups'))
+            ->filter(fn ($file) => str_ends_with($file, '.sqlite') || str_ends_with($file, '.sql'))
+            ->sortDesc()
+            ->values()
+            ->map(function (string $file) {
+                $full = Storage::path($file);
+
+                return [
+                    'path' => $file,
+                    'name' => basename($file),
+                    'size' => File::exists($full) ? File::size($full) : 0,
+                    'modified' => File::exists($full) ? File::lastModified($full) : null,
+                ];
+            });
+
         return view('admin.backups.index', [
-            'backups' => collect(Storage::files('backups'))
-                ->filter(fn ($file) => str_ends_with($file, '.sqlite') || str_ends_with($file, '.sql'))
-                ->sortDesc()
-                ->values(),
+            'backups' => $backups,
             'driver' => config('database.default'),
+            'stats' => [
+                'count' => $backups->count(),
+                'total_size' => $backups->sum('size'),
+            ],
         ]);
     }
 

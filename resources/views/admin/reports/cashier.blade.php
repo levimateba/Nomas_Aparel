@@ -17,6 +17,7 @@
         <a class="report-chip {{ $preset === 'week' ? 'is-active' : '' }}" href="{{ route('admin.reports.cashier', ['preset' => 'week']) }}">This week</a>
         <a class="report-chip {{ $preset === 'month' ? 'is-active' : '' }}" href="{{ route('admin.reports.cashier', ['preset' => 'month']) }}">This month</a>
         <a class="btn btn-secondary" href="{{ route('admin.reports.index', ['preset' => $preset, 'from' => $from, 'to' => $to]) }}">Back to reports</a>
+        <a class="btn" href="{{ route('admin.reports.cashier.export', ['preset' => $preset, 'from' => $from, 'to' => $to, 'cashier_id' => $cashierId]) }}">Export PDF</a>
         <form class="report-filter" method="GET" action="{{ route('admin.reports.cashier') }}">
             <input type="date" name="from" value="{{ $from }}">
             <input type="date" name="to" value="{{ $to }}">

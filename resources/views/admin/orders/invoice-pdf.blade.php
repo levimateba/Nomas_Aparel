@@ -3,13 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <title>Invoice {{ $order->order_number }}</title>
+    @php
+        $logoSrc = $settings->logoDataUri();
+        $showLogo = (bool) $logoSrc;
+    @endphp
     <style>
         body { font-family: DejaVu Sans, Arial, sans-serif; color: #1f2937; margin: 0; font-size: 12px; }
         .page { padding: 30px; }
-        .top { width: 100%; border-bottom: 2px solid #16456e; padding-bottom: 12px; margin-bottom: 16px; }
-        .brand { font-size: 22px; font-weight: 700; color: #16456e; }
+        .top { width: 100%; border-bottom: 2px solid #a58112; padding-bottom: 12px; margin-bottom: 16px; }
+        .brand-logo { max-height: 56px; max-width: 140px; }
+        .brand { font-size: 20px; font-weight: 700; color: #a58112; }
         .muted { color: #6b7280; font-size: 11px; }
-        .title { font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: #165752; font-weight: 700; margin-top: 8px; }
+        .title { font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: #111827; font-weight: 700; margin-top: 8px; }
         .block { border: 1px solid #d1d5db; border-radius: 6px; margin-top: 12px; }
         .block-head { background: #f4f6f8; padding: 8px 10px; font-size: 11px; font-weight: 700; text-transform: uppercase; }
         .block-body { padding: 10px; }
@@ -27,11 +32,19 @@
 <div class="page">
     <table class="top" cellpadding="0" cellspacing="0">
         <tr>
-            <td>
-                <div class="brand">{{ $settings->site_name ?? 'Store' }}</div>
-                <div class="muted">{{ $settings->site_tagline ?? 'Marketplace' }}</div>
+            <td style="vertical-align: middle; width: 55%;">
+                @if($showLogo)
+                    <img class="brand-logo" src="{{ $logoSrc }}" alt="{{ $settings->site_name ?? 'Store' }}"><br>
+                @endif
+                <div class="brand">{{ $settings->trading_name ?: ($settings->site_name ?? 'Store') }}</div>
+                <div class="muted">{{ $settings->site_tagline ?? '' }}</div>
+                @if($settings->address || $settings->phone || $settings->email)
+                    <div class="muted">
+                        {{ collect([$settings->address, $settings->city, $settings->phone, $settings->email])->filter()->implode(' · ') }}
+                    </div>
+                @endif
             </td>
-            <td class="right">
+            <td class="right" style="vertical-align: top; width: 45%;">
                 <div class="title">Order Invoice</div>
                 <div class="muted">{{ $order->order_number }}</div>
                 <div class="muted">Generated: {{ $generatedAt->format('M d, Y H:i') }}</div>

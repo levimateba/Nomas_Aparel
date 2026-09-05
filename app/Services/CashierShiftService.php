@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\CashierShift;
 use App\Models\Order;
 use App\Models\OrderReturn;
+use App\Support\Audit;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
@@ -28,7 +29,7 @@ class CashierShiftService
             throw ValidationException::withMessages(['shift' => 'You already have an open shift.']);
         }
 
-        return CashierShift::create([
+        $shift = CashierShift::create([
             'user_id' => $userId,
             'opening_cash' => $openingCash,
             'expected_cash' => $openingCash,
@@ -36,6 +37,16 @@ class CashierShiftService
             'status' => 'open',
             'notes' => $notes,
         ]);
+
+        Audit::log(
+            'shift_opened',
+            'Opened cashier shift with opening cash KES '.number_format($openingCash, 2),
+            $shift,
+            ['opening_cash' => $openingCash],
+            'pos'
+        );
+
+        return $shift;
     }
 
     public function close(CashierShift $shift, float $actualCash, ?string $notes = null): CashierShift
@@ -56,7 +67,21 @@ class CashierShiftService
                 'notes' => trim(($shift->notes ? $shift->notes."\n" : '').($notes ?? '')),
             ]);
 
-            return $shift->fresh(['user', 'orders']);
+            $closed = $shift->fresh(['user', 'orders']);
+
+            Audit::log(
+                'shift_closed',
+                'Closed cashier shift. Expected KES '.number_format($expected, 2).', actual KES '.number_format($actualCash, 2).', variance KES '.number_format($actualCash - $expected, 2),
+                $closed,
+                [
+                    'expected' => $expected,
+                    'actual' => $actualCash,
+                    'variance' => round($actualCash - $expected, 2),
+                ],
+                'pos'
+            );
+
+            return $closed;
         });
     }
 

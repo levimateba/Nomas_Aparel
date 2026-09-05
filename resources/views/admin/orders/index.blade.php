@@ -1,223 +1,249 @@
 @extends('layouts.admin')
 @section('title', 'Sales History')
-@section('heading', 'Sales History')
-@section('subheading', 'POS tickets and online orders in one desk.')
 
-@push('styles')
-<style>
-.ord-page { display: flex; flex-direction: column; gap: 18px; }
+@php
+    $filtersOpen = request()->anyFilled(['q', 'status', 'payment_method', 'source', 'from_date', 'to_date']);
+    $trendPill = function (?float $value): array {
+        if ($value === null) {
+            return ['—', 'bg-gray-100 text-gray-600'];
+        }
+        $label = ($value >= 0 ? '+' : '').number_format($value, 0).'%';
+        $class = $value >= 0 ? 'bg-success-50 text-success-700' : 'bg-error-50 text-error-700';
 
-/* KPIs */
-.ord-kpis { display: grid; grid-template-columns: repeat(3,1fr); gap: 14px; }
-@media(max-width:700px) { .ord-kpis { grid-template-columns: 1fr; } }
-.ord-kpi {
-    background: #fff; border: 1px solid #eaecf0; border-radius: 16px;
-    padding: 18px 20px; display: flex; align-items: center; gap: 14px;
-    box-shadow: 0 1px 4px rgba(0,0,0,.05);
-}
-.ord-kpi-icon { width: 46px; height: 46px; border-radius: 12px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-.ord-kpi-icon svg { width: 22px; height: 22px; }
-.ord-kpi-icon.blue   { background: #eff6ff; color: #3b82f6; }
-.ord-kpi-icon.green  { background: #ecfdf5; color: #059669; }
-.ord-kpi-icon.purple { background: #f3f0ff; color: #7c3aed; }
-.ord-kpi-label { font-size: 11px; font-weight: 700; color: #6b7280; text-transform: uppercase; letter-spacing: .06em; }
-.ord-kpi-value { font-size: 1.5rem; font-weight: 800; color: #111827; margin-top: 2px; }
-.ord-kpi-sub   { font-size: 12px; color: #9ca3af; margin-top: 2px; }
+        return [$label, $class];
+    };
+    [$todayTrendLabel, $todayTrendClass] = $trendPill($summaries['today']['trend'] ?? null);
+    [$weekTrendLabel, $weekTrendClass] = $trendPill($summaries['week']['trend'] ?? null);
+    [$monthTrendLabel, $monthTrendClass] = $trendPill($summaries['month']['trend'] ?? null);
+@endphp
 
-/* Toolbar */
-.ord-toolbar {
-    background: #fff; border: 1px solid #eaecf0; border-radius: 16px;
-    padding: 14px 18px; box-shadow: 0 1px 4px rgba(0,0,0,.04);
-    display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end;
-}
-.ord-field { display: flex; flex-direction: column; gap: 5px; min-width: 130px; flex: 1; }
-.ord-field label { font-size: 11px; font-weight: 700; color: #6b7280; text-transform: uppercase; letter-spacing: .05em; }
-.ord-field input,
-.ord-field select {
-    padding: 9px 12px; border: 1px solid #d1d5db; border-radius: 10px;
-    font-size: 13px; color: #111827; background: #fff; outline: none; margin: 0 !important;
-}
-.ord-field input:focus,
-.ord-field select:focus { border-color: #d4af37; box-shadow: 0 0 0 3px rgba(212,175,55,.12); }
-.ord-search-wrap { position: relative; }
-.ord-search-wrap input { padding-left: 34px; }
-.ord-search-icon { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: #9ca3af; pointer-events: none; }
-.ord-btn-apply {
-    background: linear-gradient(135deg,#d4af37,#b8942d); color: #1a1300;
-    border: none; border-radius: 10px; padding: 9px 18px;
-    font-size: 13px; font-weight: 800; cursor: pointer;
-    display: inline-flex; align-items: center; gap: 6px;
-}
-.ord-btn-apply:hover { opacity: .92; }
-.ord-btn-outline {
-    background: #fff; color: #374151; border: 1px solid #d1d5db; border-radius: 10px; padding: 9px 14px;
-    font-size: 13px; font-weight: 700; cursor: pointer; text-decoration: none;
-    display: inline-flex; align-items: center; gap: 6px;
-}
-.ord-btn-outline:hover { background: #f9fafb; }
-
-/* Table card */
-.ord-card {
-    background: #fff; border: 1px solid #eaecf0; border-radius: 16px;
-    overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,.04);
-}
-.ord-bulk {
-    display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
-    padding: 14px 18px; border-bottom: 1px solid #f3f4f6;
-}
-.ord-bulk select { padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 10px; font-size: 13px; min-width: 220px; margin: 0 !important; }
-
-.ord-table { width: 100%; border-collapse: collapse; }
-.ord-table thead tr { background: #f9fafb; border-bottom: 1px solid #eaecf0; }
-.ord-table thead th { font-size: 11px; font-weight: 700; color: #6b7280; text-transform: uppercase; letter-spacing: .06em; padding: 11px 14px; white-space: nowrap; text-align: left; }
-.ord-table tbody tr { border-bottom: 1px solid #f3f4f6; transition: background .12s; }
-.ord-table tbody tr:last-child { border-bottom: none; }
-.ord-table tbody tr:hover { background: rgba(212,175,55,.04); }
-.ord-table td { padding: 12px 14px; font-size: 13px; color: #374151; vertical-align: middle; }
-
-.ord-num  { font-weight: 700; color: #111827; }
-.ord-name { font-weight: 600; color: #111827; }
-.ord-email { font-size: 11px; color: #9ca3af; margin-top: 2px; }
-
-.ord-pill { display: inline-flex; border-radius: 999px; padding: 3px 10px; font-size: 11.5px; font-weight: 700; }
-.ord-pill.paid, .ord-pill.delivered, .ord-pill.completed { background: #dcfce7; color: #166534; }
-.ord-pill.processing, .ord-pill.shipped { background: #dbeafe; color: #1d4ed8; }
-.ord-pill.cancelled { background: #fee2e2; color: #991b1b; }
-.ord-pill.pending, .ord-pill.cancellation_requested { background: #fef3c7; color: #92400e; }
-.ord-pill.pos { background: #faf6ea; color: #b8942d; border: 1px solid #e8d99a; }
-.ord-pill.online { background: #f3f4f6; color: #4b5563; }
-
-.ord-view-btn {
-    background: #fff; border: 1px solid #e5e7eb; border-radius: 8px;
-    padding: 6px 14px; font-size: 12.5px; font-weight: 700; color: #374151;
-    text-decoration: none; display: inline-flex; align-items: center; gap: 5px;
-}
-.ord-view-btn:hover { background: #f3f4f6; }
-
-.ord-footer {
-    padding: 12px 18px; border-top: 1px solid #f3f4f6;
-    display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;
-}
-.ord-showing { font-size: 12px; color: #6b7280; }
-</style>
-@endpush
-
-@section('content')
-<div class="ord-page">
-
-    {{-- KPIs --}}
-    <div class="ord-kpis">
-        <div class="ord-kpi">
-            <div class="ord-kpi-icon blue">
-                <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-            </div>
+@section('page_header')
+<div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+    <div class="min-w-0">
+        <nav class="mb-2 flex flex-wrap items-center gap-1.5 text-sm text-gray-400">
+            <a href="{{ route('admin.dashboard') }}" class="hover:text-brand-500">Dashboard</a>
+            <span>/</span>
+            <span>Sales</span>
+            <span>/</span>
+            <span class="text-gray-600 dark:text-gray-300">Sales History</span>
+        </nav>
+        <div class="flex items-start gap-3">
+            <span class="mt-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-brand-700 dark:bg-brand-500/15 dark:text-brand-400">
+                <svg class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+            </span>
             <div>
-                <div class="ord-kpi-label">Today</div>
-                <div class="ord-kpi-value">{{ $summaries['today']['count'] }}</div>
-                <div class="ord-kpi-sub">KES {{ number_format($summaries['today']['revenue'], 2) }}</div>
-            </div>
-        </div>
-        <div class="ord-kpi">
-            <div class="ord-kpi-icon green">
-                <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-            </div>
-            <div>
-                <div class="ord-kpi-label">This Week</div>
-                <div class="ord-kpi-value">{{ $summaries['week']['count'] }}</div>
-                <div class="ord-kpi-sub">KES {{ number_format($summaries['week']['revenue'], 2) }}</div>
-            </div>
-        </div>
-        <div class="ord-kpi">
-            <div class="ord-kpi-icon purple">
-                <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
-            </div>
-            <div>
-                <div class="ord-kpi-label">This Month</div>
-                <div class="ord-kpi-value">{{ $summaries['month']['count'] }}</div>
-                <div class="ord-kpi-sub">KES {{ number_format($summaries['month']['revenue'], 2) }}</div>
+                <h1 class="text-xl font-bold text-gray-800 dark:text-white/90 sm:text-2xl">Sales History</h1>
+                <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">POS tickets and online orders in one desk. View, search and manage all sales transactions.</p>
             </div>
         </div>
     </div>
+    <div class="flex flex-wrap items-center gap-2">
+        <span class="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm font-medium text-gray-600 dark:border-gray-800 dark:bg-white/[0.03] dark:text-gray-300">
+            <svg class="h-4 w-4 text-brand-600" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+            {{ now()->format('D, d M Y') }}
+        </span>
+        @if(auth()->user()?->hasPermission('create_sale'))
+            <a href="{{ route('admin.pos.index') }}" class="ta-btn w-full justify-center sm:w-auto">
+                <span class="text-lg leading-none">+</span> New Sale
+            </a>
+        @endif
+    </div>
+</div>
+@endsection
 
-    {{-- Filters --}}
-    <form method="GET" action="{{ route('admin.orders.index') }}">
-        <div class="ord-toolbar">
-            <div class="ord-field" style="max-width:260px;">
-                <label>Search</label>
-                <div class="ord-search-wrap">
-                    <span class="ord-search-icon"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path stroke-linecap="round" d="M21 21l-4.35-4.35"/></svg></span>
-                    <input type="text" name="q" value="{{ request('q') }}" placeholder="Order # / customer">
+@section('content')
+<div class="space-y-5 pb-20 lg:pb-0" x-data="{ filtersOpen: {{ $filtersOpen ? 'true' : 'false' }} }">
+    <div class="grid grid-cols-2 gap-3 xl:grid-cols-4">
+        <div class="rounded-2xl border border-gray-200 bg-white p-3.5 shadow-theme-xs dark:border-gray-800 dark:bg-white/[0.03] sm:p-5">
+            <div class="flex items-start justify-between gap-2">
+                <div class="ta-kpi-icon is-blue !h-10 !w-10 sm:!h-12 sm:!w-12">
+                    <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
                 </div>
+                <span class="rounded-full px-2 py-0.5 text-[10px] font-bold {{ $todayTrendClass }}">{{ $todayTrendLabel }}</span>
             </div>
-            <div class="ord-field" style="max-width:170px;">
+            <p class="mt-3 text-[11px] font-semibold uppercase tracking-wide text-gray-500">Today</p>
+            <p class="mt-0.5 text-xl font-bold text-gray-800 dark:text-white/90 sm:text-2xl">{{ number_format($summaries['today']['count']) }}</p>
+            <p class="mt-1 text-[11px] text-gray-400">KES {{ number_format($summaries['today']['revenue'], 2) }}</p>
+            <p class="mt-1 text-[10px] text-gray-400">vs yesterday</p>
+        </div>
+        <div class="rounded-2xl border border-gray-200 bg-white p-3.5 shadow-theme-xs dark:border-gray-800 dark:bg-white/[0.03] sm:p-5">
+            <div class="flex items-start justify-between gap-2">
+                <div class="ta-kpi-icon is-success !h-10 !w-10 sm:!h-12 sm:!w-12">
+                    <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                </div>
+                <span class="rounded-full px-2 py-0.5 text-[10px] font-bold {{ $weekTrendClass }}">{{ $weekTrendLabel }}</span>
+            </div>
+            <p class="mt-3 text-[11px] font-semibold uppercase tracking-wide text-gray-500">This Week</p>
+            <p class="mt-0.5 text-xl font-bold text-gray-800 dark:text-white/90 sm:text-2xl">{{ number_format($summaries['week']['count']) }}</p>
+            <p class="mt-1 text-[11px] text-gray-400">KES {{ number_format($summaries['week']['revenue'], 2) }}</p>
+            <p class="mt-1 text-[10px] text-gray-400">vs last week</p>
+        </div>
+        <div class="rounded-2xl border border-gray-200 bg-white p-3.5 shadow-theme-xs dark:border-gray-800 dark:bg-white/[0.03] sm:p-5">
+            <div class="flex items-start justify-between gap-2">
+                <div class="ta-kpi-icon is-purple !h-10 !w-10 sm:!h-12 sm:!w-12">
+                    <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
+                </div>
+                <span class="rounded-full px-2 py-0.5 text-[10px] font-bold {{ $monthTrendClass }}">{{ $monthTrendLabel }}</span>
+            </div>
+            <p class="mt-3 text-[11px] font-semibold uppercase tracking-wide text-gray-500">This Month</p>
+            <p class="mt-0.5 text-xl font-bold text-gray-800 dark:text-white/90 sm:text-2xl">{{ number_format($summaries['month']['count']) }}</p>
+            <p class="mt-1 text-[11px] text-gray-400">KES {{ number_format($summaries['month']['revenue'], 2) }}</p>
+            <p class="mt-1 text-[10px] text-gray-400">vs last month</p>
+        </div>
+        <div class="rounded-2xl border border-gray-200 bg-white p-3.5 shadow-theme-xs dark:border-gray-800 dark:bg-white/[0.03] sm:p-5">
+            <div class="flex items-start justify-between gap-2">
+                <div class="ta-kpi-icon is-warning !h-10 !w-10 sm:!h-12 sm:!w-12">
+                    <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                </div>
+                <span class="rounded-full bg-blue-light-50 px-2 py-0.5 text-[10px] font-bold text-blue-light-700">All time</span>
+            </div>
+            <p class="mt-3 text-[11px] font-semibold uppercase tracking-wide text-gray-500">Total Sales</p>
+            <p class="mt-0.5 text-xl font-bold text-gray-800 dark:text-white/90 sm:text-2xl">{{ number_format($summaries['all']['count'] ?? 0) }}</p>
+            <p class="mt-1 text-[11px] text-gray-400">KES {{ number_format($summaries['all']['revenue'] ?? 0, 2) }}</p>
+        </div>
+    </div>
+
+    <div class="rounded-2xl border border-gray-200 bg-white p-3 shadow-theme-xs dark:border-gray-800 dark:bg-white/[0.03] sm:p-4">
+        <div class="mb-3 flex items-center justify-between">
+            <p class="text-sm font-semibold text-gray-800 dark:text-white/90">Filters &amp; Search</p>
+            <button type="button" @click="filtersOpen = !filtersOpen" class="ta-btn-outline ta-btn-sm lg:hidden">
+                <span x-text="filtersOpen ? 'Hide' : 'Show'"></span>
+            </button>
+        </div>
+        <form method="GET" action="{{ route('admin.orders.index') }}"
+              class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3"
+              :class="filtersOpen ? 'grid' : 'hidden lg:grid'">
+            <div class="ta-field sm:col-span-2 xl:col-span-1">
+                <label>Search</label>
+                <input type="text" name="q" class="ta-input" value="{{ request('q') }}" placeholder="Order # / customer">
+            </div>
+            <div class="ta-field">
                 <label>Status</label>
-                <select name="status">
-                    <option value="">All Status</option>
+                <select name="status" class="ta-select">
+                    <option value="">All Statuses</option>
                     @foreach(['pending','processing','paid','shipped','delivered','cancellation_requested','cancelled'] as $s)
                         <option value="{{ $s }}" @selected(request('status') === $s)>{{ ucwords(str_replace('_',' ',$s)) }}</option>
                     @endforeach
                 </select>
             </div>
-            <div class="ord-field" style="max-width:170px;">
+            <div class="ta-field">
                 <label>Payment</label>
-                <select name="payment_method">
+                <select name="payment_method" class="ta-select">
                     <option value="">All Methods</option>
                     @foreach(['cash','cash_on_delivery','mobile_money','bank_transfer','card'] as $m)
                         <option value="{{ $m }}" @selected(request('payment_method') === $m)>{{ ucwords(str_replace('_',' ',$m)) }}</option>
                     @endforeach
                 </select>
             </div>
-            <div class="ord-field" style="max-width:140px;">
+            <div class="ta-field">
                 <label>Source</label>
-                <select name="source">
-                    <option value="">All</option>
-                    <option value="pos" @selected(request('source') === 'pos')>In-store POS</option>
+                <select name="source" class="ta-select">
+                    <option value="">All Sources</option>
+                    <option value="pos" @selected(request('source') === 'pos')>POS</option>
                     <option value="online" @selected(request('source') === 'online')>Online</option>
                 </select>
             </div>
-            <div class="ord-field" style="max-width:160px;">
+            <div class="ta-field">
                 <label>From</label>
-                <input type="date" name="from_date" value="{{ request('from_date') }}">
+                <input type="date" name="from_date" class="ta-input" value="{{ request('from_date') }}">
             </div>
-            <div class="ord-field" style="max-width:160px;">
+            <div class="ta-field">
                 <label>To</label>
-                <input type="date" name="to_date" value="{{ request('to_date') }}">
+                <input type="date" name="to_date" class="ta-input" value="{{ request('to_date') }}">
             </div>
-            <div style="display:flex;gap:8px;align-items:flex-end;">
-                <button type="submit" class="ord-btn-apply">
-                    <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2a1 1 0 01-.293.707L13 13.414V19a1 1 0 01-.553.894l-4 2A1 1 0 017 21v-7.586L3.293 6.707A1 1 0 013 6V4z"/></svg>
-                    Apply
-                </button>
-                @if(request()->anyFilled(['q','status','payment_method','source','from_date','to_date']))
-                    <a href="{{ route('admin.orders.index') }}" class="ord-btn-outline">Clear</a>
+            <input type="hidden" name="per_page" value="{{ $perPage ?? 10 }}">
+            <div class="flex flex-wrap items-end gap-2 sm:col-span-2 xl:col-span-3">
+                <button type="submit" class="ta-btn">Filter</button>
+                @if($filtersOpen)
+                    <a href="{{ route('admin.orders.index') }}" class="ta-btn-outline">Reset</a>
                 @endif
-                <a href="{{ route('admin.orders.export.csv', request()->query()) }}" class="ord-btn-outline">
-                    <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
-                    Export CSV
-                </a>
+                <a href="{{ route('admin.orders.export.csv', request()->query()) }}" class="ta-btn-outline">Export CSV</a>
             </div>
-        </div>
-    </form>
+        </form>
+    </div>
 
-    {{-- Table --}}
-    <div class="ord-card">
+    <div class="rounded-2xl border border-gray-200 bg-white shadow-theme-xs dark:border-gray-800 dark:bg-white/[0.03]">
         <form method="POST" action="{{ route('admin.orders.bulk-update') }}">
             @csrf
-            <div class="ord-bulk">
-                <select name="status" required>
+            <div class="flex flex-wrap items-center gap-2 border-b border-gray-100 px-4 py-3 dark:border-gray-800 sm:px-5">
+                <select name="status" required class="ta-select !py-1.5" style="max-width:220px;">
                     <option value="">Set status for selected</option>
                     @foreach(['pending','processing','paid','shipped','delivered','cancellation_requested','cancelled'] as $s)
                         <option value="{{ $s }}">{{ ucwords(str_replace('_',' ',$s)) }}</option>
                     @endforeach
                 </select>
-                <button type="submit" class="ord-btn-outline" onclick="return confirm('Update selected orders?')">Apply to selected</button>
+                <button type="submit" class="ta-btn ta-btn-sm" onclick="return confirm('Update selected orders?')">Apply</button>
+                <div class="ml-auto flex items-center gap-2 text-sm text-gray-500">
+                    <span class="hidden sm:inline">Show</span>
+                    <select class="ta-select !py-1.5" style="max-width:90px;" onchange="const u=new URL(window.location.href);u.searchParams.set('per_page',this.value);window.location=u;">
+                        @foreach([10, 20, 50, 100] as $n)
+                            <option value="{{ $n }}" @selected(($perPage ?? 10) === $n)>{{ $n }}</option>
+                        @endforeach
+                    </select>
+                </div>
             </div>
 
-            <div style="overflow-x:auto;">
-                <table class="ord-table">
+            {{-- Mobile cards --}}
+            <div class="space-y-3 p-3 lg:hidden">
+                @forelse($orders as $order)
+                    @php
+                        $pillClass = match($order->status) {
+                            'paid','delivered','completed' => 'ta-pill-success',
+                            'processing','shipped' => 'ta-pill-info',
+                            'cancelled' => 'ta-pill-error',
+                            default => 'ta-pill-warning',
+                        };
+                        $isPos = ($order->source ?? null) === 'pos' || str_starts_with((string) $order->order_number, 'POS-');
+                        $initial = strtoupper(substr($order->customer_name ?: 'G', 0, 1));
+                    @endphp
+                    <div class="rounded-2xl border border-gray-200 bg-white p-3.5 shadow-theme-xs dark:border-gray-800 dark:bg-white/[0.02]">
+                        <div class="flex items-start gap-3">
+                            <input type="checkbox" name="order_ids[]" value="{{ $order->id }}" class="order-check mt-1 h-4 w-4 accent-brand-500">
+                            <div class="min-w-0 flex-1">
+                                <div class="flex items-start justify-between gap-2">
+                                    <div class="min-w-0">
+                                        <p class="truncate text-sm font-bold text-gray-800 dark:text-white/90">{{ $order->order_number }}</p>
+                                        <p class="mt-0.5 truncate text-xs text-gray-400">{{ $order->created_at?->format('d M Y · h:i A') }}</p>
+                                    </div>
+                                    <span class="ta-pill {{ $pillClass }}">{{ ucwords(str_replace('_',' ',$order->status)) }}</span>
+                                </div>
+                                <div class="mt-3 flex items-center gap-2">
+                                    <span class="flex h-8 w-8 items-center justify-center rounded-full bg-brand-500 text-xs font-bold text-white">{{ $initial }}</span>
+                                    <div class="min-w-0">
+                                        <p class="truncate text-sm font-medium text-gray-800 dark:text-white/90">{{ $order->customer_name ?: 'Guest' }}</p>
+                                        <p class="truncate text-xs text-gray-400">{{ $order->customer_email ?: ($order->customer_phone ?? '—') }}</p>
+                                    </div>
+                                </div>
+                                <div class="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-gray-100 pt-3 dark:border-gray-800">
+                                    <div>
+                                        <p class="text-sm font-bold text-gray-800 dark:text-white/90">KES {{ number_format((float) $order->total_amount, 2) }}</p>
+                                        <p class="text-xs text-gray-400">{{ ucwords(str_replace('_',' ',$order->payment_method)) }} · {{ $order->user?->name ?: '—' }}</p>
+                                    </div>
+                                    <div class="flex items-center gap-2">
+                                        @if($isPos)
+                                            <span class="rounded-full bg-brand-50 px-2.5 py-0.5 text-[10px] font-bold text-brand-800">POS</span>
+                                        @else
+                                            <span class="rounded-full bg-blue-light-50 px-2.5 py-0.5 text-[10px] font-bold text-blue-light-700">Online</span>
+                                        @endif
+                                        <a href="{{ route('admin.orders.show', $order) }}" class="ta-btn-outline ta-btn-sm">View</a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                @empty
+                    <div class="rounded-2xl border border-dashed border-gray-200 px-4 py-10 text-center text-sm text-gray-400 dark:border-gray-800">No sales found.</div>
+                @endforelse
+            </div>
+
+            <div class="ta-table-wrap hidden lg:block">
+                <table class="ta-table" style="min-width:1100px;">
                     <thead>
                         <tr>
-                            <th style="width:40px;padding-left:18px;"><input type="checkbox" id="select-all-orders" style="width:16px;height:16px;accent-color:#d4af37;cursor:pointer;"></th>
+                            <th style="width:40px;">
+                                <input type="checkbox" id="select-all-orders" class="h-4 w-4 accent-brand-500">
+                            </th>
+                            <th style="width:48px;">#</th>
                             <th>Order ID</th>
                             <th>Customer</th>
                             <th>Cashier</th>
@@ -225,64 +251,71 @@
                             <th>Payment</th>
                             <th>Source</th>
                             <th>Status</th>
-                            <th>Date</th>
-                            <th style="text-align:right;padding-right:18px;">Action</th>
+                            <th>Date &amp; Time</th>
+                            <th class="text-right">Actions</th>
                         </tr>
                     </thead>
                     <tbody>
-                    @forelse($orders as $order)
+                    @forelse($orders as $index => $order)
                         @php
                             $pillClass = match($order->status) {
-                                'paid','delivered','completed' => 'paid',
-                                'processing','shipped' => 'processing',
-                                'cancelled' => 'cancelled',
-                                default => 'pending',
+                                'paid','delivered','completed' => 'ta-pill-success',
+                                'processing','shipped' => 'ta-pill-info',
+                                'cancelled' => 'ta-pill-error',
+                                default => 'ta-pill-warning',
                             };
-                            $isPos = ($order->source ?? null) === 'pos' || str_starts_with((string)$order->order_number, 'POS-');
+                            $isPos = ($order->source ?? null) === 'pos' || str_starts_with((string) $order->order_number, 'POS-');
+                            $initial = strtoupper(substr($order->customer_name ?: 'G', 0, 1));
                         @endphp
                         <tr>
-                            <td style="padding-left:18px;">
-                                <input type="checkbox" name="order_ids[]" value="{{ $order->id }}" class="order-check" style="width:16px;height:16px;accent-color:#d4af37;cursor:pointer;">
-                            </td>
-                            <td><span class="ord-num">{{ $order->order_number }}</span></td>
                             <td>
-                                <div class="ord-name">{{ $order->customer_name }}</div>
-                                <div class="ord-email">{{ $order->customer_email }}</div>
+                                <input type="checkbox" name="order_ids[]" value="{{ $order->id }}" class="order-check h-4 w-4 accent-brand-500">
                             </td>
-                            <td style="color:#6b7280;">{{ $order->user?->name ?: '—' }}</td>
-                            <td><strong>KES {{ number_format((float)$order->total_amount, 2) }}</strong></td>
-                            <td style="color:#6b7280;">{{ ucwords(str_replace('_',' ',$order->payment_method)) }}</td>
+                            <td class="text-gray-400">{{ $orders->firstItem() + $index }}</td>
+                            <td><span class="ta-name">{{ $order->order_number }}</span></td>
+                            <td>
+                                <div class="flex items-center gap-2.5">
+                                    <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-500 text-xs font-bold text-white">{{ $initial }}</span>
+                                    <div class="min-w-0">
+                                        <div class="ta-name truncate">{{ $order->customer_name ?: 'Guest' }}</div>
+                                        <div class="ta-muted truncate">{{ $order->customer_email ?: ($order->customer_phone ?? '—') }}</div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="text-gray-500">{{ $order->user?->name ?: '—' }}</td>
+                            <td class="font-semibold text-gray-800 dark:text-white/90">KES {{ number_format((float) $order->total_amount, 2) }}</td>
+                            <td class="text-gray-500">{{ ucwords(str_replace('_',' ',$order->payment_method)) }}</td>
                             <td>
                                 @if($isPos)
-                                    <span class="ord-pill pos">POS</span>
+                                    <span class="rounded-full bg-brand-50 px-2.5 py-1 text-[11px] font-bold text-brand-800">POS</span>
                                 @else
-                                    <span class="ord-pill online">Online</span>
+                                    <span class="rounded-full bg-blue-light-50 px-2.5 py-1 text-[11px] font-bold text-blue-light-700">Online</span>
                                 @endif
                             </td>
-                            <td><span class="ord-pill {{ $pillClass }}">{{ ucwords(str_replace('_',' ',$order->status)) }}</span></td>
-                            <td style="color:#9ca3af;font-size:12px;">{{ $order->created_at->format('d M Y H:i') }}</td>
-                            <td style="text-align:right;padding-right:18px;">
-                                <a href="{{ route('admin.orders.show', $order) }}" class="ord-view-btn">
-                                    <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                            <td><span class="ta-pill {{ $pillClass }}">{{ ucwords(str_replace('_',' ',$order->status)) }}</span></td>
+                            <td class="whitespace-nowrap text-xs text-gray-500">{{ $order->created_at?->format('d M Y h:i A') }}</td>
+                            <td class="text-right">
+                                <a href="{{ route('admin.orders.show', $order) }}" class="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm font-medium text-brand-700 hover:bg-brand-50">
+                                    <svg class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
                                     View
                                 </a>
                             </td>
                         </tr>
                     @empty
-                        <tr><td colspan="10" style="text-align:center;padding:48px;color:#9ca3af;font-size:14px;">No sales found.</td></tr>
+                        <tr><td colspan="11" class="ta-empty">No sales found.</td></tr>
                     @endforelse
                     </tbody>
                 </table>
             </div>
         </form>
 
-        <div class="ord-footer">
-            <span class="ord-showing">Showing {{ $orders->firstItem() ?? 0 }} to {{ $orders->lastItem() ?? 0 }} of {{ $orders->total() }} orders</span>
+        <div class="flex flex-col gap-3 border-t border-gray-100 px-4 py-3 dark:border-gray-800 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+            <span class="ta-muted">Showing {{ $orders->firstItem() ?? 0 }} to {{ $orders->lastItem() ?? 0 }} of {{ $orders->total() }}</span>
             {{ $orders->links() }}
         </div>
     </div>
-
 </div>
+
 <script>
 document.getElementById('select-all-orders')?.addEventListener('change', function () {
     document.querySelectorAll('.order-check').forEach(el => el.checked = this.checked);

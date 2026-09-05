@@ -34,60 +34,134 @@ class RolePermissionSeeder extends Seeder
             $role->permissions()->sync($ids);
         };
 
-        $superAdmin = Role::query()->firstOrCreate(
-            ['name' => 'Super Admin'],
-            ['slug' => 'super-admin', 'description' => 'Full access to every module.']
+        $superAdmin = Role::query()->updateOrCreate(
+            ['slug' => 'super-admin'],
+            ['name' => 'Super Admin', 'description' => 'Full access to every module.']
         );
-        $admin = Role::query()->firstOrCreate(
-            ['name' => 'Admin'],
-            ['slug' => 'admin', 'description' => 'Full administrative access.']
+        $admin = Role::query()->updateOrCreate(
+            ['slug' => 'admin'],
+            ['name' => 'Admin', 'description' => 'Full store + staff administration.']
         );
-        $manager = Role::query()->firstOrCreate(
-            ['name' => 'Manager'],
-            ['slug' => 'manager', 'description' => 'Store operations without deleting users or restoring backups.']
+        $manager = Role::query()->updateOrCreate(
+            ['slug' => 'manager'],
+            ['name' => 'Store Manager', 'description' => 'Run the store: sales, inventory, employees & customers — no Users/Roles/system admin.']
         );
-        $cashier = Role::query()->firstOrCreate(
-            ['name' => 'Cashier'],
-            ['slug' => 'cashier', 'description' => 'In-store POS sales.']
-        );
-        $stockManager = Role::query()->firstOrCreate(
-            ['name' => 'Stock Manager'],
-            ['slug' => 'stock-manager', 'description' => 'Products, categories, and stocktakes.']
-        );
-
-        $storeCore = [
-            'view_dashboard', 'create_sale', 'view_sales', 'manage_products', 'manage_pos_categories',
-            'manage_stocktakes', 'approve_stocktakes', 'manage_coupons', 'manage_vendors',
-            'view_pos_reports', 'view_cashier_performance', 'process_return', 'manage_shifts',
-            'manage_blog', 'manage_reviews', 'backup_database', 'restore_database',
-        ];
-        $userAdmin = [
-            'view_users', 'create_users', 'edit_users', 'delete_users', 'assign_roles_to_users',
-            'view_roles', 'create_roles', 'edit_roles', 'delete_roles', 'assign_permissions_to_roles',
-            'view_permissions', 'create_permissions', 'edit_permissions', 'delete_permissions',
-            'manage_system_settings', 'view_user_groups', 'manage_user_groups',
-        ];
-
-        $sync($superAdmin, $allPermissions->keys()->all());
-        $sync($admin, array_merge($storeCore, $userAdmin));
-        $sync($manager, array_merge(array_values(array_diff($storeCore, ['restore_database'])), [
-            'view_users', 'create_users', 'edit_users', 'assign_roles_to_users',
-            'view_roles', 'view_permissions', 'manage_system_settings',
-        ]));
-        $sync($cashier, ['view_dashboard', 'create_sale', 'view_sales', 'process_return', 'manage_shifts']);
-        $sync($stockManager, [
-            'view_dashboard', 'manage_products', 'manage_pos_categories',
-            'manage_stocktakes', 'view_pos_reports',
+        // Keep legacy "Manager" name synced if an old row still exists under that name
+        Role::query()->where('name', 'Manager')->where('slug', '!=', 'manager')->update([
+            'name' => 'Store Manager',
+            'slug' => 'manager',
         ]);
 
-        $staff = Role::query()->where('slug', 'staff')->first();
-        if ($staff) {
-            $sync($staff, [
-                'view_dashboard', 'create_sale', 'view_sales', 'manage_products',
-                'manage_pos_categories', 'manage_stocktakes', 'manage_blog', 'manage_reviews',
-                'view_pos_reports', 'process_return', 'manage_shifts',
-            ]);
-        }
+        $cashier = Role::query()->updateOrCreate(
+            ['slug' => 'cashier'],
+            ['name' => 'Cashier', 'description' => 'POS sales, shifts, customers, and returns only.']
+        );
+        $stockManager = Role::query()->updateOrCreate(
+            ['slug' => 'stock-manager'],
+            ['name' => 'Stock Manager', 'description' => 'Products, purchasing, transfers, and stock control — no POS sales.']
+        );
+        $staff = Role::query()->updateOrCreate(
+            ['slug' => 'staff'],
+            ['name' => 'Staff', 'description' => 'Limited sales helper: sell and view sales/shifts only.']
+        );
+
+        // Cashier: sell, customers, returns, own shifts
+        $cashierPermissions = [
+            'view_dashboard',
+            'create_sale',
+            'view_sales',
+            'process_return',
+            'manage_shifts',
+            'manage_customers',
+        ];
+
+        // Stock Manager: inventory + purchasing — no POS sales, no full sales reports
+        $stockManagerPermissions = [
+            'view_dashboard',
+            'manage_products',
+            'manage_pos_categories',
+            'manage_stocktakes',
+            'view_inventory',
+            'create_stock_transfers',
+            'complete_stock_transfers',
+            'adjust_stock',
+            'view_stock_movements',
+            'manage_stock_locations',
+            'manage_suppliers',
+            'manage_purchases',
+            'manage_purchase_orders',
+        ];
+
+        // Store Manager: run the store — no Users / Roles / system admin
+        $managerPermissions = [
+            'view_dashboard',
+            'create_sale',
+            'view_sales',
+            'manage_products',
+            'manage_pos_categories',
+            'manage_stocktakes',
+            'approve_stocktakes',
+            'view_inventory',
+            'create_stock_transfers',
+            'approve_stock_transfers',
+            'complete_stock_transfers',
+            'adjust_stock',
+            'view_stock_movements',
+            'manage_stock_locations',
+            'manage_coupons',
+            'manage_customers',
+            'manage_employees',
+            'manage_expenses',
+            'manage_suppliers',
+            'manage_purchases',
+            'manage_purchase_orders',
+            'approve_purchase_orders',
+            'view_pos_reports',
+            'view_cashier_performance',
+            'process_return',
+            'manage_shifts',
+            'manage_loyalty',
+        ];
+
+        // Staff: sell and view own sales/shifts only (no returns, no customer CRM)
+        $staffPermissions = [
+            'view_dashboard',
+            'create_sale',
+            'view_sales',
+            'manage_shifts',
+        ];
+
+        // Admin: store ops + users/roles/settings/website (Super Admin still gets everything)
+        $adminPermissions = array_values(array_unique(array_merge($managerPermissions, [
+            'manage_vendors',
+            'manage_blog',
+            'manage_reviews',
+            'manage_website',
+            'manage_system_settings',
+            'view_audit_logs',
+            'view_users',
+            'create_users',
+            'edit_users',
+            'delete_users',
+            'assign_roles_to_users',
+            'view_roles',
+            'create_roles',
+            'edit_roles',
+            'delete_roles',
+            'assign_permissions_to_roles',
+            'view_permissions',
+            'view_user_groups',
+            'manage_user_groups',
+            'backup_database',
+            'restore_database',
+        ])));
+
+        $sync($superAdmin, $allPermissions->keys()->all());
+        $sync($admin, $adminPermissions);
+        $sync($manager, $managerPermissions);
+        $sync($cashier, $cashierPermissions);
+        $sync($stockManager, $stockManagerPermissions);
+        $sync($staff, $staffPermissions);
 
         if (Schema::hasTable('role_user')) {
             User::query()->whereNotNull('role_id')->each(function (User $user) {

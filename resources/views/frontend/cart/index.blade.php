@@ -11,20 +11,20 @@
             <div style="margin:10px 0;padding:10px;border-radius:8px;background:#ecfdf5;color:#065f46;">{{ session('success') }}</div>
         @endif
 
-        @forelse($cart as $item)
+        @forelse($cart as $lineKey => $item)
             <div style="display:grid;grid-template-columns:80px 1fr auto;gap:12px;align-items:center;padding:10px 0;border-bottom:1px solid #e5e7eb;">
                 <div style="width:80px;height:80px;border-radius:8px;background:#f3f4f6 url('{{ $item['image_url'] ?: 'https://via.placeholder.com/160x160?text=Item' }}') center/cover no-repeat;"></div>
                 <div>
                     <div style="font-weight:600;">{{ $item['name'] }}</div>
-                    <div style="color:#6b7280;font-size:13px;">KES {{ number_format((float) $item['price'], 2) }}</div>
+                    <div style="color:#6b7280;font-size:13px;">KES {{ number_format((float) $item['price'], 2) }} @if(!empty($item['sku'])) · {{ $item['sku'] }}@endif</div>
                 </div>
                 <div style="display:flex;align-items:center;gap:8px;">
-                    <form method="POST" action="{{ route('cart.update', $item['product_id']) }}">
+                    <form method="POST" action="{{ route('cart.update', $lineKey) }}">
                         @csrf
                         <input type="number" min="1" name="qty" value="{{ $item['qty'] }}" style="width:68px;padding:8px;border:1px solid #d1d5db;border-radius:8px;">
                         <button class="btn btn-primary" type="submit" style="padding:8px 10px;">Update</button>
                     </form>
-                    <form method="POST" action="{{ route('cart.remove', $item['product_id']) }}">
+                    <form method="POST" action="{{ route('cart.remove', $lineKey) }}">
                         @csrf
                         <button class="btn" type="submit" style="padding:8px 10px;">Remove</button>
                     </form>
@@ -59,8 +59,8 @@
             </strong>
             <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;">
                 @guest
-                    <a href="{{ route('checkout.index') }}" class="btn btn-primary">Login to checkout</a>
-                    <a href="{{ route('register') }}?redirect=checkout" class="btn">Register</a>
+                    <a href="{{ route('login', ['redirect' => 'checkout']) }}" class="btn btn-primary">Login to checkout</a>
+                    <a href="{{ route('register', ['redirect' => 'checkout']) }}" class="btn">Create account</a>
                 @else
                     <a href="{{ route('checkout.index') }}" class="btn btn-primary">Checkout</a>
                 @endguest
@@ -72,7 +72,7 @@
             </div>
         </div>
         @guest
-            <p style="margin:12px 0 0;color:#6b7280;">You need to login or register before completing checkout.</p>
+            <p style="margin:12px 0 0;color:#6b7280;">You must login or create an account before completing checkout.</p>
         @endguest
     </div>
 </div>

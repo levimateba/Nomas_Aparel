@@ -11,7 +11,15 @@ class UserGroupController extends Controller
     public function index()
     {
         $groups = UserGroup::withCount('users')->latest()->paginate(12);
-        return view('admin.user-group.index', compact('groups'));
+
+        return view('admin.user-group.index', [
+            'groups' => $groups,
+            'stats' => [
+                'total' => UserGroup::count(),
+                'with_users' => UserGroup::has('users')->count(),
+                'members' => (int) UserGroup::withCount('users')->get()->sum('users_count'),
+            ],
+        ]);
     }
 
     public function create()

@@ -10,6 +10,7 @@
     $pwaText = $pwaIsAdmin
         ? 'Add the POS app to your tablet home screen for faster checkout.'
         : 'Add to your home screen for quick access while shopping.';
+    $pwaBannerIcon = url('/pwa/icon-192.png').'?v='.config('pwa.cache_version', '1');
 @endphp
 <style>
     #pwa-install-banner{{ $pwaSuffix }} {
@@ -100,7 +101,7 @@
 <div id="pwa-install-banner{{ $pwaSuffix }}" role="dialog" aria-live="polite" aria-label="Install app">
     <img
         class="pwa-icon"
-        src="{{ $settings->logo ?? url('/pwa/icon-192.png') }}"
+        src="{{ $pwaBannerIcon }}"
         alt="{{ $pwaSiteName }}"
         width="48"
         height="48"

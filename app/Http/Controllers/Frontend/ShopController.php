@@ -36,6 +36,11 @@ class ShopController extends Controller
             });
         }
 
+        if ($request->boolean('sale')) {
+            $query->whereNotNull('sale_price')
+                ->whereColumn('sale_price', '<', 'price');
+        }
+
         $sort = $request->string('sort', 'latest')->toString();
         if ($sort === 'name_asc') {
             $query->orderBy('name');
@@ -45,7 +50,7 @@ class ShopController extends Controller
             $query->latest();
         }
 
-        $products = $query->paginate(16)->withQueryString();
+        $products = $query->paginate(48)->withQueryString();
         $categories = Category::query()->where('is_active', true)->orderBy('id')->get();
 
         return view('frontend.shop.index', compact('products', 'categories'));
@@ -57,7 +62,7 @@ class ShopController extends Controller
             $query->where('approved', true)->latest();
         }, 'questions' => function ($query) {
             $query->where('approved', true)->latest();
-        }, 'vendor']);
+        }, 'vendor', 'activeVariants.attributeValues', 'images', 'specifications', 'style', 'brand']);
         $averageRating = round((float) $product->reviews->avg('rating'), 1);
 
         $related = Product::query()
@@ -75,10 +80,21 @@ class ShopController extends Controller
             ->limit(8)
             ->get();
 
+        $inventory = app(\App\Services\InventoryStockService::class);
+        $onlineStockByVariant = [];
+        foreach ($product->activeVariants as $variant) {
+            $onlineStockByVariant[$variant->id] = $inventory->onlineAvailableStock($product, $variant);
+        }
+        $onlineStockSimple = $product->usesVariants()
+            ? null
+            : $inventory->onlineAvailableStock($product, null);
+
         return view('frontend.shop.show', [
             'product' => $product,
             'relatedProducts' => $related,
             'averageRating' => $averageRating,
+            'onlineStockByVariant' => $onlineStockByVariant,
+            'onlineStockSimple' => $onlineStockSimple,
         ]);
     }
 }

@@ -21,7 +21,7 @@
 .os-badge.paid, .os-badge.delivered, .os-badge.completed { background: #dcfce7; color: #166534; }
 .os-badge.processing, .os-badge.shipped { background: #dbeafe; color: #1d4ed8; }
 .os-badge.cancelled { background: #fee2e2; color: #991b1b; }
-.os-badge.pending, .os-badge.cancellation_requested { background: #fef3c7; color: #92400e; }
+.os-badge.pending, .os-badge.cancellation_requested, .os-badge.return_requested { background: #fef3c7; color: #92400e; }
 
 .os-action-btn {
     background: #fff; border: 1px solid #d1d5db; border-radius: 10px;
@@ -170,11 +170,17 @@
                     @if((float)($order->discount_amount ?? 0) > 0)
                         <div class="os-total-row">
                             <span>Subtotal</span>
-                            <span>KES {{ number_format((float)$order->total_amount + (float)$order->discount_amount, 2) }}</span>
+                            <span>KES {{ number_format((float)$order->total_amount + (float)$order->discount_amount + (float)($order->loyalty_discount_amount ?? 0) - (($settings->tax_inclusive ?? true) ? 0 : (float)($order->tax_amount ?? 0)), 2) }}</span>
                         </div>
                         <div class="os-total-row" style="color:#059669;">
                             <span>Discount</span>
                             <span>− KES {{ number_format((float)$order->discount_amount, 2) }}</span>
+                        </div>
+                    @endif
+                    @if(($settings->tax_enabled ?? false) || (float)($order->tax_amount ?? 0) > 0)
+                        <div class="os-total-row">
+                            <span>{{ method_exists($settings, 'taxReceiptLabel') ? $settings->taxReceiptLabel() : 'Tax' }}</span>
+                            <span>KES {{ number_format((float)($order->tax_amount ?? 0), 2) }}</span>
                         </div>
                     @endif
                     <div class="os-total-row grand">
@@ -193,7 +199,7 @@
                         <div class="os-status-field">
                             <label>Order Status</label>
                             <select name="status" class="os-input">
-                                @foreach(['pending','processing','paid','shipped','delivered','cancellation_requested','cancelled'] as $s)
+                                @foreach(['pending','processing','paid','shipped','delivered','cancellation_requested','return_requested','cancelled'] as $s)
                                     <option value="{{ $s }}" @selected($order->status === $s)>{{ ucwords(str_replace('_',' ',$s)) }}</option>
                                 @endforeach
                             </select>
@@ -289,6 +295,16 @@
                     <div>
                         <strong>Cancellation Requested:</strong> {{ $order->cancellation_requested_at->format('M d, Y H:i') }}<br>
                         <strong>Reason:</strong> {{ $order->cancellation_reason ?: 'N/A' }}
+                    </div>
+                </div>
+            @endif
+
+            @if($order->return_requested_at)
+                <div class="os-note os-note-warn">
+                    <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                    <div>
+                        <strong>Return Requested:</strong> {{ $order->return_requested_at->format('M d, Y H:i') }}<br>
+                        <strong>Reason:</strong> {{ $order->return_reason ?: 'N/A' }}
                     </div>
                 </div>
             @endif

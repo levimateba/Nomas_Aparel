@@ -1,242 +1,97 @@
 @extends('layouts.admin')
-@section('title','Create Contact')
-@section('content')
-    <style>
-        .contact-form-wrap {
-            display: grid;
-            gap: 18px;
-        }
-        .contact-form-head h2 {
-            margin: 0;
-            font-size: 1.6rem;
-            color: #121212;
-        }
-        .contact-form-head p {
-            margin: 8px 0 0;
-            color: #5f5f5f;
-            font-size: 0.95rem;
-        }
-        .contact-form-grid {
-            display: grid;
-            grid-template-columns: 2fr 1fr;
-            gap: 20px;
-        }
-        .contact-section-card {
-            border: 1px solid rgba(0, 0, 0, 0.08);
-            border-radius: 14px;
-            padding: 16px;
-            background: #ffffff;
-        }
-        .contact-section-title {
-            margin: 0 0 14px;
-            font-size: 1rem;
-            font-weight: 700;
-            color: #1f1f1f;
-        }
-        .contact-field {
-            margin-bottom: 14px;
-        }
-        .contact-field:last-child {
-            margin-bottom: 0;
-        }
-        .contact-label-row {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            margin-bottom: 6px;
-        }
-        .contact-label-row label {
-            margin: 0;
-            font-weight: 600;
-            color: #1f1f1f;
-        }
-        .contact-required {
-            color: #8a1f2d;
-            font-size: 0.82rem;
-            font-weight: 600;
-        }
-        .contact-help {
-            color: #666;
-            font-size: 0.84rem;
-            margin-top: 5px;
-            display: block;
-        }
-        .contact-form-grid input[type="text"],
-        .contact-form-grid select {
-            width: 100%;
-            border: 1px solid #d9dee3;
-            border-radius: 10px;
-            padding: 11px 12px;
-            font-size: 0.95rem;
-            background: #fff;
-        }
-        .contact-form-grid input:focus,
-        .contact-form-grid select:focus {
-            outline: none;
-            border-color: #d4af37;
-            box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.16);
-        }
-        .contact-preview {
-            border: 1px dashed #c9ced3;
-            border-radius: 12px;
-            background: #fafafa;
-            min-height: 200px;
-            display: grid;
-            place-items: center;
-            text-align: center;
-            padding: 14px;
-            gap: 10px;
-        }
-        .contact-badge {
-            border-radius: 999px;
-            padding: 6px 12px;
-            font-size: 0.78rem;
-            font-weight: 700;
-            letter-spacing: 0.04em;
-            text-transform: uppercase;
-            background: rgba(212, 175, 55, 0.2);
-            color: #121212;
-            border: 1px solid rgba(212, 175, 55, 0.36);
-        }
-        .contact-preview-title {
-            font-weight: 700;
-            color: #1f1f1f;
-            font-size: 1rem;
-        }
-        .contact-preview-value {
-            color: #2f2f2f;
-            font-size: 0.95rem;
-            word-break: break-word;
-        }
-        .contact-actions {
-            display: flex;
-            gap: 10px;
-            margin-top: 18px;
-            flex-wrap: wrap;
-        }
-        .btn-outline {
-            border: 1px solid #d4af37;
-            border-radius: 999px;
-            color: #1f1f1f;
-            background: #fff;
-            padding: 9px 15px;
-            text-decoration: none;
-            font-weight: 600;
-        }
-        @media (max-width: 960px) {
-            .contact-form-grid {
-                grid-template-columns: 1fr;
-            }
-        }
-    </style>
+@section('title', 'Create Contact')
 
-    <div class="contact-form-wrap">
-        <div class="contact-form-head">
-            <h2>Create Contact</h2>
-            <p>Add a clear contact item for your frontend pages with a label, value, and type that visitors can understand quickly.</p>
-        </div>
-
-        <div class="card">
-            <form method="POST" action="{{ route('admin.contact.store') }}">
-                @csrf
-
-                <div class="contact-form-grid">
-                    <div class="contact-section-card">
-                        <h3 class="contact-section-title">Contact Details</h3>
-
-                        <div class="contact-field">
-                            <div class="contact-label-row">
-                                <label for="contact-label">Label</label>
-                                <span class="contact-required">Required</span>
-                            </div>
-                            <input id="contact-label" type="text" name="label" value="{{ old('label') }}" maxlength="255" placeholder="e.g. Customer Support" required>
-                            <small class="contact-help">This is the name users will see for this contact item.</small>
-                        </div>
-
-                        <div class="contact-field">
-                            <div class="contact-label-row">
-                                <label for="contact-type">Type</label>
-                                <span class="contact-required">Required</span>
-                            </div>
-                            <select id="contact-type" name="type" required>
-                                <option value="text" {{ old('type')=='text' ? 'selected' : '' }}>Text</option>
-                                <option value="email" {{ old('type')=='email' ? 'selected' : '' }}>Email</option>
-                                <option value="phone" {{ old('type')=='phone' ? 'selected' : '' }}>Phone</option>
-                                <option value="address" {{ old('type')=='address' ? 'selected' : '' }}>Address</option>
-                            </select>
-                        </div>
-
-                        <div class="contact-field">
-                            <div class="contact-label-row">
-                                <label for="contact-value">Value</label>
-                                <span class="contact-required">Required</span>
-                            </div>
-                            <input id="contact-value" type="text" name="value" value="{{ old('value') }}" maxlength="255" placeholder="e.g. info@example.com" required>
-                            <small class="contact-help" id="contact-value-help">Provide the actual contact value users should use.</small>
-                        </div>
-                    </div>
-
-                    <div class="contact-section-card">
-                        <h3 class="contact-section-title">Preview</h3>
-
-                        <div class="contact-preview">
-                            <span class="contact-badge" id="contact-type-preview">Text</span>
-                            <div class="contact-preview-title" id="contact-label-preview">Contact Label Preview</div>
-                            <div class="contact-preview-value" id="contact-value-preview">Contact value preview</div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="contact-actions">
-                    <button type="submit">Create Contact</button>
-                    <a class="btn-outline" href="{{ route('admin.contact.index') }}">Cancel</a>
-                </div>
-            </form>
-        </div>
+@section('page_header')
+<div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+    <div>
+        <nav class="mb-2 flex flex-wrap items-center gap-1.5 text-sm text-gray-400">
+            <a href="{{ route('admin.dashboard') }}" class="hover:text-brand-500">Dashboard</a>
+            <span>/</span>
+            <a href="{{ route('admin.contact.index') }}" class="hover:text-brand-500">Contacts</a>
+            <span>/</span>
+            <span class="text-gray-600 dark:text-gray-300">Create</span>
+        </nav>
+        <h1 class="text-2xl font-bold text-gray-800 dark:text-white/90">Create Contact</h1>
+        <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Add a phone, email, address, or text item for the public site.</p>
     </div>
+    <a href="{{ route('admin.contact.index') }}" class="ta-btn-outline">← Back</a>
+</div>
+@endsection
 
-    <script>
-        (function () {
-            const labelInput = document.getElementById('contact-label');
-            const valueInput = document.getElementById('contact-value');
-            const typeInput = document.getElementById('contact-type');
-            const labelPreview = document.getElementById('contact-label-preview');
-            const valuePreview = document.getElementById('contact-value-preview');
-            const typePreview = document.getElementById('contact-type-preview');
-            const valueHelp = document.getElementById('contact-value-help');
+@section('content')
+<div class="ta-page">
+    <form method="POST" action="{{ route('admin.contact.store') }}" class="grid gap-5 lg:grid-cols-[minmax(0,1.4fr)_minmax(240px,0.8fr)]">
+        @csrf
+        <div class="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
+            <h2 class="text-base font-bold text-gray-800 dark:text-white/90">Contact details</h2>
+            <div class="mt-5 space-y-4">
+                <div class="ta-field">
+                    <label for="contact-label">Label</label>
+                    <input id="contact-label" class="ta-input" type="text" name="label" value="{{ old('label') }}" maxlength="255" placeholder="e.g. Customer Support" required>
+                    <p class="mt-1 text-xs text-gray-500">Name visitors will see for this contact item.</p>
+                </div>
+                <div class="ta-field">
+                    <label for="contact-type">Type</label>
+                    <select id="contact-type" class="ta-select" name="type" required>
+                        <option value="text" @selected(old('type') === 'text')>Text</option>
+                        <option value="email" @selected(old('type') === 'email')>Email</option>
+                        <option value="phone" @selected(old('type') === 'phone')>Phone</option>
+                        <option value="address" @selected(old('type') === 'address')>Address</option>
+                    </select>
+                </div>
+                <div class="ta-field">
+                    <label for="contact-value">Value</label>
+                    <input id="contact-value" class="ta-input" type="text" name="value" value="{{ old('value') }}" maxlength="255" placeholder="e.g. info@example.com" required>
+                    <p class="mt-1 text-xs text-gray-500" id="contact-value-help">Provide the actual contact value users should use.</p>
+                </div>
+            </div>
+            <div class="mt-6 flex flex-wrap gap-2">
+                <button class="ta-btn" type="submit">Create contact</button>
+                <a href="{{ route('admin.contact.index') }}" class="ta-btn-outline">Cancel</a>
+            </div>
+        </div>
 
-            function getTypeHint(type) {
-                if (type === 'email') {
-                    return 'Use a valid email address, for example support@yourdomain.com.';
-                }
-                if (type === 'phone') {
-                    return 'Use a phone format users can call, for example +254 700 000 000.';
-                }
-                if (type === 'address') {
-                    return 'Use a physical location users can find easily.';
-                }
-                return 'Provide the actual contact value users should use.';
-            }
+        <aside class="rounded-2xl border border-dashed border-gray-300 bg-[#faf8f2] p-6 dark:border-gray-700 dark:bg-brand-500/10">
+            <h3 class="text-sm font-bold text-gray-800 dark:text-white/90">Live preview</h3>
+            <div class="mt-5 flex min-h-[180px] flex-col items-center justify-center gap-3 text-center">
+                <span id="contact-type-preview" class="inline-flex rounded-full bg-white px-3 py-1 text-xs font-bold uppercase tracking-wide text-brand-800 dark:bg-white/10 dark:text-brand-300">Text</span>
+                <div id="contact-label-preview" class="text-base font-bold text-gray-800 dark:text-white/90">Contact Label Preview</div>
+                <div id="contact-value-preview" class="text-sm text-gray-600 dark:text-gray-300">Contact value preview</div>
+            </div>
+        </aside>
+    </form>
+</div>
 
-            function updatePreview() {
-                const labelValue = (labelInput.value || '').trim();
-                const valueValue = (valueInput.value || '').trim();
-                const typeValue = (typeInput.value || 'text').trim();
+<script>
+(function () {
+    var labelInput = document.getElementById('contact-label');
+    var valueInput = document.getElementById('contact-value');
+    var typeInput = document.getElementById('contact-type');
+    var labelPreview = document.getElementById('contact-label-preview');
+    var valuePreview = document.getElementById('contact-value-preview');
+    var typePreview = document.getElementById('contact-type-preview');
+    var valueHelp = document.getElementById('contact-value-help');
 
-                labelPreview.textContent = labelValue || 'Contact Label Preview';
-                valuePreview.textContent = valueValue || 'Contact value preview';
-                typePreview.textContent = typeValue;
-                valueHelp.textContent = getTypeHint(typeValue);
-            }
+    function getTypeHint(type) {
+        if (type === 'email') return 'Use a valid email address, for example support@yourdomain.com.';
+        if (type === 'phone') return 'Use a phone format users can call, for example +254 700 000 000.';
+        if (type === 'address') return 'Use a physical location users can find easily.';
+        return 'Provide the actual contact value users should use.';
+    }
 
-            [labelInput, valueInput, typeInput].forEach(function (element) {
-                if (element) {
-                    element.addEventListener('input', updatePreview);
-                    element.addEventListener('change', updatePreview);
-                }
-            });
+    function updatePreview() {
+        labelPreview.textContent = (labelInput.value || '').trim() || 'Contact Label Preview';
+        valuePreview.textContent = (valueInput.value || '').trim() || 'Contact value preview';
+        typePreview.textContent = (typeInput.value || 'text').trim();
+        valueHelp.textContent = getTypeHint(typeInput.value || 'text');
+    }
 
-            updatePreview();
-        })();
-    </script>
+    [labelInput, valueInput, typeInput].forEach(function (el) {
+        if (!el) return;
+        el.addEventListener('input', updatePreview);
+        el.addEventListener('change', updatePreview);
+    });
+    updatePreview();
+})();
+</script>
 @endsection

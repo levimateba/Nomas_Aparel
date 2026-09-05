@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Coupon;
+use App\Support\Audit;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
@@ -32,7 +33,9 @@ class CouponController extends Controller
         $data['code'] = strtoupper(trim($data['code']));
         $data['is_active'] = $request->boolean('is_active');
 
-        Coupon::create($data);
+        $coupon = Coupon::create($data);
+
+        Audit::log('coupon_created', 'Created coupon '.$coupon->code, $coupon, [], 'pos');
 
         return redirect()->route('admin.coupons.index')->with('success', 'Coupon created.');
     }
@@ -50,12 +53,17 @@ class CouponController extends Controller
 
         $coupon->update($data);
 
+        Audit::log('coupon_updated', 'Updated coupon '.$coupon->code, $coupon, [], 'pos');
+
         return redirect()->route('admin.coupons.index')->with('success', 'Coupon updated.');
     }
 
     public function destroy(Coupon $coupon)
     {
+        $code = $coupon->code;
         $coupon->delete();
+
+        Audit::log('coupon_deleted', 'Deleted coupon '.$code, null, ['code' => $code], 'pos');
 
         return back()->with('success', 'Coupon deleted.');
     }

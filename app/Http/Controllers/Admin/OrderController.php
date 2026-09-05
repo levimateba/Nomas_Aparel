@@ -16,6 +16,10 @@ class OrderController extends Controller
     public function index()
     {
         $query = Order::query()->with('user')->latest();
+        $user = auth()->user();
+        if ($user && method_exists($user, 'isFrontlineCashier') && $user->isFrontlineCashier()) {
+            $query->where('user_id', $user->id);
+        }
         if (request()->filled('status')) {
             $query->where('status', request('status'));
         }
@@ -28,9 +32,12 @@ class OrderController extends Controller
         if (request()->filled('q')) {
             $term = trim((string) request('q'));
             $query->where(function ($builder) use ($term) {
-                $builder->where('order_number', 'like', '%' . $term . '%')
-                    ->orWhere('customer_name', 'like', '%' . $term . '%')
-                    ->orWhere('customer_email', 'like', '%' . $term . '%');
+                $builder->where('order_number', 'like', '%'.$term.'%')
+                    ->orWhere('customer_name', 'like', '%'.$term.'%')
+                    ->orWhere('customer_email', 'like', '%'.$term.'%');
+                if (Schema::hasColumn('orders', 'customer_phone')) {
+                    $builder->orWhere('customer_phone', 'like', '%'.$term.'%');
+                }
             });
         }
         if (request()->filled('from_date')) {
@@ -39,38 +46,80 @@ class OrderController extends Controller
         if (request()->filled('to_date')) {
             $query->whereDate('created_at', '<=', request('to_date'));
         }
-        $orders = $query->paginate(20)->withQueryString();
 
-        $todayStart = now()->startOfDay();
+        $perPage = (int) request('per_page', 10);
+        if (! in_array($perPage, [10, 20, 50, 100], true)) {
+            $perPage = 10;
+        }
+        $orders = $query->paginate($perPage)->withQueryString();
+
+        $summaryBase = Order::query();
+        if ($user && method_exists($user, 'isFrontlineCashier') && $user->isFrontlineCashier()) {
+            $summaryBase->where('user_id', $user->id);
+        }
+
+        $paid = fn ($q) => $q->where('status', '!=', 'cancelled');
+
+        $todayCount = (clone $summaryBase)->whereDate('created_at', today())->count();
+        $todayRevenue = (float) $paid(clone $summaryBase)->whereDate('created_at', today())->sum('total_amount');
+        $yesterdayCount = (clone $summaryBase)->whereDate('created_at', today()->subDay())->count();
+        $yesterdayRevenue = (float) $paid(clone $summaryBase)->whereDate('created_at', today()->subDay())->sum('total_amount');
+
         $weekStart = now()->startOfWeek();
+        $lastWeekStart = now()->subWeek()->startOfWeek();
+        $lastWeekEnd = now()->subWeek()->endOfWeek();
+        $weekCount = (clone $summaryBase)->where('created_at', '>=', $weekStart)->count();
+        $weekRevenue = (float) $paid(clone $summaryBase)->where('created_at', '>=', $weekStart)->sum('total_amount');
+        $lastWeekCount = (clone $summaryBase)->whereBetween('created_at', [$lastWeekStart, $lastWeekEnd])->count();
+        $lastWeekRevenue = (float) $paid(clone $summaryBase)->whereBetween('created_at', [$lastWeekStart, $lastWeekEnd])->sum('total_amount');
+
         $monthStart = now()->startOfMonth();
+        $lastMonthStart = now()->subMonth()->startOfMonth();
+        $lastMonthEnd = now()->subMonth()->endOfMonth();
+        $monthCount = (clone $summaryBase)->where('created_at', '>=', $monthStart)->count();
+        $monthRevenue = (float) $paid(clone $summaryBase)->where('created_at', '>=', $monthStart)->sum('total_amount');
+        $lastMonthCount = (clone $summaryBase)->whereBetween('created_at', [$lastMonthStart, $lastMonthEnd])->count();
+        $lastMonthRevenue = (float) $paid(clone $summaryBase)->whereBetween('created_at', [$lastMonthStart, $lastMonthEnd])->sum('total_amount');
+
+        $allCount = (clone $summaryBase)->count();
+        $allRevenue = (float) $paid(clone $summaryBase)->sum('total_amount');
+
+        $trend = function (float $current, float $previous): ?float {
+            if ($previous <= 0) {
+                return $current > 0 ? 100.0 : null;
+            }
+
+            return round((($current - $previous) / $previous) * 100, 0);
+        };
 
         $summaries = [
             'today' => [
-                'count' => Order::where('created_at', '>=', $todayStart)->count(),
-                'revenue' => (float) Order::where('created_at', '>=', $todayStart)
-                    ->where('status', '!=', 'cancelled')
-                    ->sum('total_amount'),
+                'count' => $todayCount,
+                'revenue' => $todayRevenue,
+                'trend' => $trend($todayRevenue, $yesterdayRevenue) ?? $trend((float) $todayCount, (float) $yesterdayCount),
             ],
             'week' => [
-                'count' => Order::where('created_at', '>=', $weekStart)->count(),
-                'revenue' => (float) Order::where('created_at', '>=', $weekStart)
-                    ->where('status', '!=', 'cancelled')
-                    ->sum('total_amount'),
+                'count' => $weekCount,
+                'revenue' => $weekRevenue,
+                'trend' => $trend($weekRevenue, $lastWeekRevenue) ?? $trend((float) $weekCount, (float) $lastWeekCount),
             ],
             'month' => [
-                'count' => Order::where('created_at', '>=', $monthStart)->count(),
-                'revenue' => (float) Order::where('created_at', '>=', $monthStart)
-                    ->where('status', '!=', 'cancelled')
-                    ->sum('total_amount'),
+                'count' => $monthCount,
+                'revenue' => $monthRevenue,
+                'trend' => $trend($monthRevenue, $lastMonthRevenue) ?? $trend((float) $monthCount, (float) $lastMonthCount),
+            ],
+            'all' => [
+                'count' => $allCount,
+                'revenue' => $allRevenue,
             ],
         ];
 
-        return view('admin.orders.index', compact('orders', 'summaries'));
+        return view('admin.orders.index', compact('orders', 'summaries', 'perPage'));
     }
 
     public function show(Order $order)
     {
+        $this->assertCashierOwnsOrder($order);
         $order->load('items');
 
         return view('admin.orders.show', compact('order'));
@@ -78,6 +127,7 @@ class OrderController extends Controller
 
     public function print(Order $order)
     {
+        $this->assertCashierOwnsOrder($order);
         $order->load('items');
         $settings = Setting::get_settings();
 
@@ -90,6 +140,7 @@ class OrderController extends Controller
 
     public function downloadPdf(Order $order)
     {
+        $this->assertCashierOwnsOrder($order);
         $order->load('items');
         $settings = Setting::get_settings();
 
@@ -104,6 +155,7 @@ class OrderController extends Controller
 
     public function sendConfirmation(Order $order)
     {
+        $this->assertCashierOwnsOrder($order);
         $order->load('items');
 
         try {
@@ -117,8 +169,10 @@ class OrderController extends Controller
 
     public function update(Request $request, Order $order)
     {
+        abort_if($this->isFrontlineCashier(), 403, 'Cashiers cannot change order status.');
+
         $data = $request->validate([
-            'status' => 'required|in:pending,processing,paid,shipped,delivered,cancelled,cancellation_requested',
+            'status' => 'required|in:pending,processing,paid,shipped,delivered,cancelled,cancellation_requested,return_requested',
         ]);
 
         $order->update($data);
@@ -128,10 +182,12 @@ class OrderController extends Controller
 
     public function bulkUpdate(Request $request)
     {
+        abort_if($this->isFrontlineCashier(), 403, 'Cashiers cannot bulk-update orders.');
+
         $data = $request->validate([
             'order_ids' => 'required|array|min:1',
             'order_ids.*' => 'integer|exists:orders,id',
-            'status' => 'required|in:pending,processing,paid,shipped,delivered,cancelled,cancellation_requested',
+            'status' => 'required|in:pending,processing,paid,shipped,delivered,cancelled,cancellation_requested,return_requested',
         ]);
 
         Order::query()->whereIn('id', $data['order_ids'])->update(['status' => $data['status']]);
@@ -142,6 +198,10 @@ class OrderController extends Controller
     public function exportCsv(Request $request)
     {
         $query = Order::query()->latest();
+        $user = auth()->user();
+        if ($user && method_exists($user, 'isFrontlineCashier') && $user->isFrontlineCashier()) {
+            $query->where('user_id', $user->id);
+        }
         if ($request->filled('status')) {
             $query->where('status', $request->string('status')->toString());
         }
@@ -188,5 +248,20 @@ class OrderController extends Controller
             }
             fclose($output);
         }, $filename, ['Content-Type' => 'text/csv']);
+    }
+
+    private function isFrontlineCashier(): bool
+    {
+        $user = auth()->user();
+
+        return (bool) ($user && method_exists($user, 'isFrontlineCashier') && $user->isFrontlineCashier());
+    }
+
+    private function assertCashierOwnsOrder(Order $order): void
+    {
+        $user = auth()->user();
+        if ($user && method_exists($user, 'isFrontlineCashier') && $user->isFrontlineCashier() && (int) $order->user_id !== (int) $user->id) {
+            abort(403, 'You can only view your own sales.');
+        }
     }
 }

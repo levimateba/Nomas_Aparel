@@ -62,8 +62,12 @@ class AuthController extends Controller
     /**
      * Show login form
      */
-    public function showLogin()
+    public function showLogin(Request $request)
     {
+        if ($request->query('redirect') === 'checkout') {
+            session(['url.intended' => route('checkout.index')]);
+        }
+
         return view('auth.login');
     }
 

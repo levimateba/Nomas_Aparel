@@ -99,11 +99,13 @@
 </head>
 <body>
     @php
-        $brandName = $settings->site_name ?? 'Store';
+        $brandName = $settings->displayName();
         $rawLogoPath = (is_object($settings) && method_exists($settings, 'getRawOriginal'))
             ? $settings->getRawOriginal('logo')
             : ($settings->logo ?? null);
-        $brandLogo = \App\Support\PublicStorageUrl::fromPath($rawLogoPath) ?? ($settings->logo ?? null);
+        $brandLogo = $settings->showsLogoOnLogin()
+            ? (\App\Support\PublicStorageUrl::fromPath($rawLogoPath) ?? ($settings->logo ?? null))
+            : null;
         $needsCheckout = str_contains((string) session('url.intended'), '/checkout');
     @endphp
     <div class="auth-wrap">
@@ -116,6 +118,9 @@
                 <p>@yield('subheading', $brandName)</p>
             </div>
             <div class="auth-body">
+                @if(session('success'))
+                    <div class="notice">{{ session('success') }}</div>
+                @endif
                 @if($needsCheckout)
                     <div class="notice">Please login or register to continue checkout.</div>
                 @endif

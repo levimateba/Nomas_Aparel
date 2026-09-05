@@ -19,7 +19,7 @@ return [
     /*
     | Bump this when deploying asset or shell changes so clients refresh caches.
     */
-    'cache_version' => env('PWA_CACHE_VERSION', '1'),
+    'cache_version' => '4',
 
     'admin_theme_color' => env('PWA_ADMIN_THEME_COLOR', '#121212'),
 

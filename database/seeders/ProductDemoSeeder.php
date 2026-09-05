@@ -229,6 +229,10 @@ class ProductDemoSeeder extends Seeder
         ];
 
         foreach ($products as $item) {
+            $localImage = '/images/products/'.Str::slug($item['sku']).'.jpg';
+            $localPath = public_path(ltrim($localImage, '/'));
+            $imageUrl = is_file($localPath) ? $localImage : $item['image_url'];
+
             Product::query()->updateOrCreate(
                 ['sku' => $item['sku']],
                 [
@@ -240,10 +244,13 @@ class ProductDemoSeeder extends Seeder
                     'price' => $item['price'],
                     'sale_price' => $item['sale_price'],
                     'stock' => $item['stock'],
-                    'image_url' => $item['image_url'],
+                    'image_url' => $imageUrl,
                     'is_active' => true,
                 ]
             );
         }
+
+        // Keep every catalog product sellable on the storefront.
+        Product::query()->update(['is_active' => true]);
     }
 }

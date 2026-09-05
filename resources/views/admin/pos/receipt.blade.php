@@ -2,17 +2,24 @@
 @section('title', 'Receipt ' . $order->order_number)
 
 @php
-    $brandName = $settings->site_name ?? 'Store';
-    $nameParts = preg_split('/\s+/', trim($brandName)) ?: [$brandName];
-    $brandTop = $nameParts[0] ?? $brandName;
-    $brandGold = trim(implode(' ', array_slice($nameParts, 1)));
-    $rawLogoPath = (is_object($settings) && method_exists($settings, 'getRawOriginal'))
-        ? $settings->getRawOriginal('logo')
-        : ($settings->logo ?? null);
-    $brandLogo = \App\Support\PublicStorageUrl::fromPath($rawLogoPath) ?? ($settings->logo ?? null);
-    $contacts = collect($siteContacts ?? []);
-    $phone = optional($contacts->firstWhere('type', 'phone'))->value;
-    $address = optional($contacts->firstWhere('type', 'address'))->value;
+    $loyaltySettings = $loyaltySettings ?? \App\Models\LoyaltySetting::current();
+    $brandName = $settings->displayName();
+    $receiptHeader = trim((string) ($settings->receipt_header ?: $brandName));
+    $receiptFooter = trim((string) ($settings->receipt_footer ?: 'Thank you for shopping with us. Goods once sold are not returnable without receipt.'));
+    $phone = $settings->phone;
+    $address = collect([
+        $settings->address,
+        $settings->city,
+    ])->filter()->implode(', ');
+    $taxPin = $settings->tax_pin;
+    $regNo = $settings->business_registration_number;
+    $showLogo = $settings->showsLogoOnReceipts();
+    $brandLogo = $showLogo ? $settings->logo : null;
+    $escpos = (bool) ($settings->escpos_enabled ?? true);
+    $copies = \App\Support\ReceiptPrintMode::copiesFor($settings->receipt_print_mode);
+    $autoPrint = (bool) session('pos_auto_print');
+    $openDrawer = (bool) session('pos_open_drawer');
+
     $cashReceived = null;
     $cashChange = null;
     $displayNotes = trim((string) ($order->notes ?? ''));
@@ -22,28 +29,58 @@
         $displayNotes = trim(preg_replace('/Cash received:\s*KES\s*[0-9,]+\.\d{2}\.\s*Change:\s*KES\s*[0-9,]+\.\d{2}\.?/is', '', $displayNotes));
     }
     $paymentLabel = ucwords(str_replace('_', ' ', (string) $order->payment_method));
+
+    $shareLines = [
+        '*' . strtoupper($brandName) . ' — Receipt*',
+        'Receipt: ' . $order->order_number,
+        'Date: ' . $order->created_at->format('d M Y H:i'),
+        '',
+    ];
+    foreach ($order->items as $item) {
+        $shareLines[] = '• ' . $item->product_name . ' x' . $item->quantity . ' — KES ' . number_format((float) $item->line_total, 2);
+    }
+    if ((float) ($order->discount_amount ?? 0) > 0) {
+        $shareLines[] = 'Discount: -KES ' . number_format((float) $order->discount_amount, 2);
+    }
+    if ((float) ($order->tax_amount ?? 0) > 0 || ($settings->tax_enabled ?? false)) {
+        $shareLines[] = $settings->taxReceiptLabel() . ': KES ' . number_format((float) ($order->tax_amount ?? 0), 2);
+    }
+    $shareLines[] = '';
+    $shareLines[] = '*TOTAL: KES ' . number_format((float) $order->total_amount, 2) . '*';
+    $shareLines[] = 'Customer: ' . ($order->customer_name ?: 'Walk-in Customer');
+    $shareLines[] = 'Payment: ' . $paymentLabel . ' · Paid';
+    if ($cashReceived !== null) {
+        $shareLines[] = 'Cash received: KES ' . $cashReceived;
+        $shareLines[] = 'Change: KES ' . $cashChange;
+    }
+    if ($phone) {
+        $shareLines[] = 'Store: ' . $phone;
+    }
+    $shareLines[] = '';
+    $shareLines[] = $receiptFooter;
+    $shareText = implode("\n", $shareLines);
+    $whatsAppUrl = 'https://wa.me/?text=' . rawurlencode($shareText);
+    $smsUrl = 'sms:?&body=' . rawurlencode($shareText);
 @endphp
 
 @push('styles')
 <style>
-    @page { size: 80mm auto; margin: 0; }
+    @page { size: {{ $escpos ? '80mm auto' : 'A4' }}; margin: {{ $escpos ? '0' : '12mm' }}; }
     body { background: #ececec; }
     .receipt-page { padding: 20px 12px 36px; display: grid; justify-items: center; gap: 14px; }
     .receipt {
-        width: 80mm; max-width: 80mm; background: #fff; color: #111;
+        width: {{ $escpos ? '80mm' : 'min(720px, 100%)' }}; max-width: 100%; background: #fff; color: #111;
         box-shadow: 0 10px 24px rgba(18,18,18,.12);
-        font-size: 11px; line-height: 1.35; overflow: hidden;
+        font-size: {{ $escpos ? '11px' : '14px' }}; line-height: 1.35; overflow: hidden;
+        page-break-after: always;
     }
+    .receipt:last-of-type { page-break-after: auto; }
     .receipt-pad { padding: 8px 6px 6px; }
     .brand { text-align: center; }
     .brand img { width: 28px; height: 28px; object-fit: cover; border-radius: 4px; margin-bottom: 4px; }
-    .brand .mark {
-        width: 28px; height: 28px; margin: 0 auto 4px; background: #121212; color: #d4af37;
-        display: grid; place-items: center; font-weight: 800; font-size: 14px; border-radius: 4px;
-    }
-    .brand strong { display: block; font-size: 12px; letter-spacing: .04em; text-transform: uppercase; }
-    .brand .gold { color: #d4af37; }
-    .brand .tag, .brand .contact { color: #444; font-size: 10px; }
+    .brand strong { display: block; font-size: 12px; letter-spacing: .04em; text-transform: uppercase; white-space: pre-line; }
+    .brand .contact { color: #444; font-size: 10px; }
+    .copy-badge { text-align:center; font-size:10px; font-weight:800; letter-spacing:.08em; margin:4px 0; color:#555; }
     .rule { border: 0; border-top: 1px dashed #bbb; margin: 6px 0; }
     .title { text-align: center; font-weight: 800; letter-spacing: .12em; font-size: 11px; margin: 6px 0 4px; }
     .kv { display: flex; justify-content: space-between; gap: 8px; font-size: 10px; }
@@ -60,111 +97,200 @@
     .meta { font-size: 10px; }
     .meta div { display: flex; justify-content: space-between; gap: 8px; margin: 2px 0; }
     .cash { border: 1px dashed #111; padding: 5px; margin-top: 6px; }
-    .thanks { text-align: center; margin-top: 8px; font-size: 10px; }
-    .thanks b { display: block; letter-spacing: .04em; }
-    .print-hint { max-width: 80mm; color: #4b5563; font-size: 12px; text-align: center; }
-    .actions { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; max-width: 420px; }
+    .thanks { text-align: center; margin-top: 8px; font-size: 10px; white-space: pre-line; }
+    .print-hint { max-width: 420px; color: #4b5563; font-size: 12px; text-align: center; }
+    .actions {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
+        width: min(420px, 100%);
+        max-width: 100%;
+        padding: 0 4px;
+        box-sizing: border-box;
+    }
     .actions a, .actions button {
-        display: inline-flex; align-items: center; gap: 6px; border: 0; border-radius: 8px;
-        padding: 10px 12px; font-weight: 800; font-size: 12px; cursor: pointer; text-transform: uppercase;
+        display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+        border: 0; border-radius: 10px; padding: 12px 10px; font-weight: 800; font-size: 12px;
+        cursor: pointer; text-transform: uppercase; text-decoration: none; width: 100%;
+        font-family: inherit; box-sizing: border-box;
     }
     .actions .gold { background: #d4af37; color: #121212; }
     .actions .dark { background: #121212; color: #fff; }
     .actions .ghost { background: #fff; color: #121212; border: 1px solid #d1d5db; }
+    .actions .whatsapp { background: #25d366; color: #fff; }
+    .actions .share { background: #1877f2; color: #fff; }
+    .actions .sms { background: #0f766e; color: #fff; }
+    .share-note { max-width: 420px; width: 100%; color: #6b7280; font-size: 12px; text-align: center; }
+    @media (min-width: 520px) {
+        .actions { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    }
     @media print {
-        html, body { width: 80mm; background: #fff !important; margin: 0; }
+        html, body { width: {{ $escpos ? '80mm' : 'auto' }}; background: #fff !important; margin: 0; }
         .receipt-page { padding: 0; display: block; }
-        .receipt { width: 80mm; max-width: 80mm; box-shadow: none; }
-        .brand .gold { color: #111; }
-        .print-hint, .actions { display: none !important; }
+        .receipt { width: {{ $escpos ? '80mm' : '100%' }}; max-width: {{ $escpos ? '80mm' : '100%' }}; box-shadow: none; }
+        .print-hint, .actions, .share-note, .pos-top, .alert { display: none !important; }
     }
 </style>
 @endpush
 
 @section('content')
 <div class="receipt-page">
-    <article class="receipt">
-        <div class="receipt-pad">
-            <header class="brand">
-                @if(!empty($brandLogo))
-                    <img src="{{ $brandLogo }}" alt="{{ $brandName }}">
-                @else
-                    <div class="mark">{{ strtoupper(substr($brandTop, 0, 1)) }}</div>
-                @endif
-                <strong>{{ strtoupper($brandTop) }}</strong>
-                @if($brandGold !== '')
-                    <strong class="gold">{{ strtoupper($brandGold) }}</strong>
-                @endif
-                <div class="tag">{{ $settings->site_tagline ?: 'Best Quality For You' }}</div>
-                @if($phone)<div class="contact">{{ $phone }}</div>@endif
-                @if($address)<div class="contact">{{ $address }}</div>@endif
-            </header>
-
-            <hr class="rule">
-            <div class="title">IN-STORE RECEIPT</div>
-            <div class="kv"><span>Receipt</span><b>{{ $order->order_number }}</b></div>
-            <div class="kv"><span>Date</span><b>{{ $order->created_at->format('d M Y H:i') }}</b></div>
-            <hr class="rule">
-
-            <table>
-                <thead>
-                    <tr>
-                        <th>Item</th>
-                        <th>Qty</th>
-                        <th>KES</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach($order->items as $item)
-                        <tr>
-                            <td>{{ $item->product_name }}</td>
-                            <td>{{ $item->quantity }}</td>
-                            <td>{{ number_format((float) $item->line_total, 2) }}</td>
-                        </tr>
-                    @endforeach
-                    @if((float) ($order->discount_amount ?? 0) > 0)
-                        <tr>
-                            <td colspan="2">Discount {{ $order->coupon_code ? '(' . $order->coupon_code . ')' : '' }}</td>
-                            <td>-{{ number_format((float) $order->discount_amount, 2) }}</td>
-                        </tr>
+    @foreach($copies as $copy)
+        <article class="receipt">
+            <div class="receipt-pad">
+                <header class="brand">
+                    @if($showLogo && !empty($brandLogo))
+                        <img src="{{ $brandLogo }}" alt="{{ $brandName }}">
                     @endif
-                    <tr class="tot">
-                        <td colspan="2">TOTAL</td>
-                        <td>{{ number_format((float) $order->total_amount, 2) }}</td>
-                    </tr>
-                </tbody>
-            </table>
+                    <strong>{{ $receiptHeader }}</strong>
+                    @if($phone)<div class="contact">{{ $phone }}</div>@endif
+                    @if($address)<div class="contact">{{ $address }}</div>@endif
+                    @if($taxPin)<div class="contact">PIN: {{ $taxPin }}</div>@endif
+                    @if($regNo)<div class="contact">Reg: {{ $regNo }}</div>@endif
+                </header>
 
-            <hr class="rule">
-            <div class="meta">
-                <div><span>Customer</span><b>{{ $order->customer_name }}</b></div>
-                <div><span>Payment</span><b>{{ $paymentLabel }} · Paid</b></div>
-                <div><span>Cashier</span><b>{{ $order->user?->name ?? auth()->user()?->name }}</b></div>
-            </div>
+                <div class="copy-badge">{{ strtoupper($copy) }} COPY</div>
+                <hr class="rule">
+                <div class="title">IN-STORE RECEIPT</div>
+                <div class="kv"><span>Receipt</span><b>{{ $order->order_number }}</b></div>
+                <div class="kv"><span>Date</span><b>{{ $order->created_at->format('d M Y H:i') }}</b></div>
+                <hr class="rule">
 
-            @if($cashReceived !== null)
-                <div class="cash">
-                    <div class="kv"><span>Cash received</span><b>{{ $cashReceived }}</b></div>
-                    <div class="kv"><span>Change</span><b>{{ $cashChange }}</b></div>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Item</th>
+                            <th>Qty</th>
+                            <th>Total</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach($order->items as $item)
+                            <tr>
+                                <td>{{ $item->product_name }}</td>
+                                <td>{{ $item->quantity }}</td>
+                                <td>{{ number_format((float) $item->line_total, 2) }}</td>
+                            </tr>
+                        @endforeach
+                        @if((float) ($order->discount_amount ?? 0) > 0)
+                            <tr>
+                                <td colspan="2">Discount</td>
+                                <td>-{{ number_format((float) $order->discount_amount, 2) }}</td>
+                            </tr>
+                        @endif
+                        @if((float) ($order->loyalty_discount_amount ?? 0) > 0)
+                            <tr>
+                                <td colspan="2">Loyalty discount</td>
+                                <td>-{{ number_format((float) $order->loyalty_discount_amount, 2) }}</td>
+                            </tr>
+                        @endif
+                        @if(($settings->tax_enabled ?? false) || (float) ($order->tax_amount ?? 0) > 0)
+                            <tr>
+                                <td colspan="2">{{ $settings->taxReceiptLabel() }}</td>
+                                <td>{{ number_format((float) ($order->tax_amount ?? 0), 2) }}</td>
+                            </tr>
+                        @endif
+                        <tr class="tot">
+                            <td colspan="2">TOTAL</td>
+                            <td>{{ number_format((float) $order->total_amount, 2) }}</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <div class="meta" style="margin-top:8px;">
+                    <div><span>Customer</span><b>{{ $order->customer_name ?: 'Walk-in' }}</b></div>
+                    <div><span>Payment</span><b>{{ $paymentLabel }}</b></div>
                 </div>
-            @endif
 
-            @if($displayNotes !== '')
-                <p class="thanks">{{ $displayNotes }}</p>
-            @endif
+                @php
+                    $showLoyaltyReceipt = ($loyaltySettings->enabled ?? false)
+                        && ($loyaltySettings->show_on_receipt ?? false)
+                        && ($order->shop_customer_id || (int) ($order->loyalty_points_earned ?? 0) > 0 || (int) ($order->loyalty_points_redeemed ?? 0) > 0);
+                    $receiptCard = $order->shopCustomer?->loyaltyCard;
+                    $balanceAfter = $receiptCard?->points_balance;
+                @endphp
+                @if($showLoyaltyReceipt)
+                    <hr class="rule">
+                    <div class="meta">
+                        @if($receiptCard)
+                            <div><span>Loyalty Card</span><b>{{ $receiptCard->card_number }}</b></div>
+                        @endif
+                        @if((int) ($order->loyalty_points_earned ?? 0) > 0)
+                            <div><span>Points Earned</span><b>+{{ (int) $order->loyalty_points_earned }}</b></div>
+                        @endif
+                        @if((int) ($order->loyalty_points_redeemed ?? 0) > 0)
+                            <div><span>Points Redeemed</span><b>{{ (int) $order->loyalty_points_redeemed }}</b></div>
+                            <div><span>Loyalty Discount</span><b>KES {{ number_format((float) ($order->loyalty_discount_amount ?? 0), 2) }}</b></div>
+                        @endif
+                        @if($balanceAfter !== null)
+                            <div><span>Available Points</span><b>{{ number_format($balanceAfter) }}</b></div>
+                        @endif
+                    </div>
+                @endif
 
-            <div class="thanks">
-                <b>THANK YOU FOR SHOPPING WITH US</b>
-                Goods once sold are not returnable or exchangeable.
+                @if($cashReceived !== null)
+                    <div class="cash">
+                        <div class="kv"><span>Cash received</span><b>KES {{ $cashReceived }}</b></div>
+                        <div class="kv"><span>Change</span><b>KES {{ $cashChange }}</b></div>
+                    </div>
+                @endif
+
+                <div class="thanks">{{ $receiptFooter }}</div>
             </div>
-        </div>
-    </article>
+        </article>
+    @endforeach
 
-    <p class="print-hint no-print">Fits 80mm thermal paper. In the print dialog choose the receipt printer, paper size 80mm, and turn off headers and footers.</p>
+    <p class="print-hint no-print">{{ $escpos ? 'Fits 80mm thermal paper. In the print dialog choose the receipt printer, paper size 80mm, and turn off headers and footers.' : 'A4 / PDF receipt layout is enabled in settings.' }}</p>
+    <p class="share-note no-print">Share this receipt with the customer via WhatsApp, SMS, or other apps.</p>
     <div class="actions no-print">
         <button class="gold" type="button" onclick="window.print()">Print Receipt</button>
+        <a class="whatsapp" href="{{ $whatsAppUrl }}" target="_blank" rel="noopener">WhatsApp</a>
+        <button class="share" type="button" id="receipt-share-btn">Share</button>
+        <a class="sms" href="{{ $smsUrl }}">SMS</a>
         <a class="dark" href="{{ route('admin.pos.index') }}">New Sale</a>
         <a class="ghost" href="{{ route('admin.orders.show', $order) }}">View Order</a>
     </div>
 </div>
+<iframe id="drawer-frame" title="Cash drawer" style="position:absolute;width:0;height:0;border:0;visibility:hidden;"></iframe>
+<script>
+(function () {
+    var text = @json($shareText);
+    var title = @json($brandName . ' Receipt ' . $order->order_number);
+    var btn = document.getElementById('receipt-share-btn');
+    if (btn) {
+        btn.addEventListener('click', function () {
+            if (navigator.share) {
+                navigator.share({ title: title, text: text }).catch(function () {});
+                return;
+            }
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(text).then(function () {
+                    btn.textContent = 'Copied';
+                    setTimeout(function () { btn.textContent = 'Share'; }, 1600);
+                }).catch(function () {
+                    window.prompt('Copy receipt text', text);
+                });
+                return;
+            }
+            window.prompt('Copy receipt text', text);
+        });
+    }
+
+    function openDrawer() {
+        var frame = document.getElementById('drawer-frame');
+        if (!frame) return;
+        var doc = frame.contentWindow.document;
+        doc.open();
+        doc.write('<html><body><pre style="font-size:1px;color:#fff;">\x1B\x70\x00\x19\xFA</pre><script>window.onload=function(){window.print();}<\/script></body></html>');
+        doc.close();
+    }
+
+    @if($openDrawer)
+    openDrawer();
+    @endif
+    @if($autoPrint)
+    setTimeout(function () { window.print(); }, 450);
+    @endif
+})();
+</script>
 @endsection

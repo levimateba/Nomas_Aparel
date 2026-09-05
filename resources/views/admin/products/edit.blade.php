@@ -13,6 +13,16 @@
 .pf-card-head { display:flex; align-items:center; gap:12px; padding:16px 20px; border-bottom:1px solid var(--pf-line); background:#fafafa; }
 .pf-card-num { width:28px; height:28px; border-radius:50%; background:var(--pf-gold); color:#1a1300; font-size:13px; font-weight:800; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
 .pf-card-title { font-size:15px; font-weight:700; color:var(--pf-text); margin:0; }
+.pf-card-sub { font-size:12px; color:var(--pf-muted); margin:2px 0 0; }
+.pf-optional { display:inline-block; margin-left:6px; padding:2px 8px; border-radius:999px; background:#f3f4f6; color:#6b7280; font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; vertical-align:middle; }
+.pf-card-num.is-muted { background:#e5e7eb; color:#6b7280; font-size:16px; }
+.pf-details { margin-bottom:16px; }
+.pf-details > .pf-summary { list-style:none; cursor:pointer; user-select:none; display:flex; align-items:center; gap:12px; }
+.pf-details > .pf-summary::-webkit-details-marker { display:none; }
+.pf-details:not([open]) > .pf-summary { border-bottom:none; }
+.pf-details[open] > .pf-summary .pf-chevron { transform:rotate(180deg); }
+.pf-chevron { margin-left:auto; color:#9ca3af; flex-shrink:0; transition:transform .15s; }
+.pf-summary > div:nth-child(2) { flex:1; min-width:0; }
 .pf-card-body { padding:20px; }
 .pf-grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
 .pf-grid-4 { display:grid; grid-template-columns:repeat(4,1fr); gap:16px; }
@@ -30,6 +40,8 @@ textarea.pf-input { resize:vertical; min-height:90px; }
 .pf-input-wrap { position:relative; display:flex; align-items:stretch; }
 .pf-input-wrap .pf-input { flex:1; border-radius:var(--pf-radius) 0 0 var(--pf-radius); }
 .pf-input-suffix { padding:10px 12px; background:#f3f4f6; border:1px solid #d1d5db; border-left:none; border-radius:0 var(--pf-radius) var(--pf-radius) 0; font-size:13px; font-weight:700; color:var(--pf-muted); display:flex; align-items:center; }
+.pf-input-btn { padding:10px 14px; background:#f3f4f6; border:1px solid #d1d5db; border-left:none; border-radius:0 var(--pf-radius) var(--pf-radius) 0; font-size:12px; font-weight:700; color:var(--pf-text); cursor:pointer; white-space:nowrap; }
+.pf-input-btn:hover { background:#e5e7eb; }
 .pf-sale-notice { display:flex; justify-content:space-between; align-items:center; padding:10px 14px; background:#fffbeb; border:1px solid #fde68a; border-radius:10px; font-size:12.5px; color:#92400e; flex-wrap:wrap; gap:8px; }
 .pf-upload-zone { border:2px dashed #d1d5db; border-radius:var(--pf-radius); padding:24px 20px; text-align:center; cursor:pointer; background:#fafafa; transition:border-color .15s; }
 .pf-upload-zone:hover { border-color:var(--pf-gold); background:#fffdf0; }
@@ -73,19 +85,42 @@ textarea.pf-input { resize:vertical; min-height:90px; }
 @endpush
 
 @section('content')
+@include('admin.partials.backup-reminder')
 <form method="POST" action="{{ route('admin.products.update', $product) }}" enctype="multipart/form-data" id="pf-form">
 @csrf @method('PUT')
 
 <div class="pf-page">
     {{-- Left --}}
     <div>
-        {{-- 1. Basic Information --}}
         <div class="pf-card">
             <div class="pf-card-head">
                 <div class="pf-card-num">1</div>
-                <h3 class="pf-card-title">Basic Information</h3>
+                <h3 class="pf-card-title">Product Information</h3>
             </div>
             <div class="pf-card-body" style="display:grid;gap:16px;">
+                <div class="pf-field">
+                    <label class="pf-label" for="product-name">Name <span class="req">*</span></label>
+                    <input id="product-name" type="text" name="name" class="pf-input @error('name') is-invalid @enderror" value="{{ old('name',$product->name) }}" required maxlength="255">
+                    @error('name')<span class="pf-error">{{ $message }}</span>@enderror
+                </div>
+                <div class="pf-grid-2">
+                    <div class="pf-field">
+                        <label class="pf-label" for="product-sku">SKU</label>
+                        <div class="pf-input-wrap">
+                            <input id="product-sku" type="text" name="sku" class="pf-input @error('sku') is-invalid @enderror" value="{{ old('sku',$product->sku) }}">
+                            <button type="button" class="pf-input-btn" onclick="generateSku()">Generate SKU</button>
+                        </div>
+                        @error('sku')<span class="pf-error">{{ $message }}</span>@enderror
+                    </div>
+                    <div class="pf-field">
+                        <label class="pf-label" for="product-barcode">Barcode (primary)</label>
+                        <input id="product-barcode" type="text" name="barcode" class="pf-input @error('barcode') is-invalid @enderror" value="{{ old('barcode',$product->barcode) }}" maxlength="64" inputmode="numeric">
+                        @error('barcode')<span class="pf-error">{{ $message }}</span>@enderror
+                    </div>
+                </div>
+
+                @include('admin.products._pos_inventory_extras', ['product' => $product])
+
                 <div class="pf-grid-2">
                     <div class="pf-field">
                         <label class="pf-label" for="product-category">Category</label>
@@ -97,7 +132,27 @@ textarea.pf-input { resize:vertical; min-height:90px; }
                         </select>
                     </div>
                     <div class="pf-field">
-                        <label class="pf-label" for="product-vendor">Vendor</label>
+                        <label class="pf-label" for="product-supplier">Supplier</label>
+                        <select id="product-supplier" name="supplier_id" class="pf-input">
+                            <option value="">None</option>
+                            @foreach(($suppliers ?? []) as $supplier)
+                                <option value="{{ $supplier->id }}" @selected((string)old('supplier_id', $product->supplier_id) === (string)$supplier->id)>{{ $supplier->name }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                </div>
+                <div class="pf-grid-2">
+                    <div class="pf-field">
+                        <label class="pf-label" for="product-brand">Brand (optional)</label>
+                        <select id="product-brand" name="brand_id" class="pf-input">
+                            <option value="">— No brand —</option>
+                            @foreach(($brands ?? []) as $brand)
+                                <option value="{{ $brand->id }}" @selected((string)old('brand_id', $product->brand_id) === (string)$brand->id)>{{ $brand->name }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="pf-field">
+                        <label class="pf-label" for="product-vendor">Marketplace vendor</label>
                         <select id="product-vendor" name="vendor_id" class="pf-input">
                             <option value="">Platform / In-house</option>
                             @foreach($vendors as $vendor)
@@ -106,44 +161,41 @@ textarea.pf-input { resize:vertical; min-height:90px; }
                         </select>
                     </div>
                 </div>
-                <div class="pf-grid-2">
-                    <div class="pf-field">
-                        <label class="pf-label" for="product-name">Product Name <span class="req">*</span></label>
-                        <input id="product-name" type="text" name="name" class="pf-input @error('name') is-invalid @enderror" value="{{ old('name',$product->name) }}" required maxlength="255">
-                        @error('name')<span class="pf-error">{{ $message }}</span>@enderror
-                    </div>
-                    <div class="pf-field">
-                        <label class="pf-label" for="product-slug">Slug (URL)</label>
-                        <input id="product-slug" type="text" name="slug" class="pf-input" value="{{ old('slug',$product->slug) }}">
-                    </div>
-                </div>
                 <div class="pf-field">
-                    <label class="pf-label" for="product-description">Description</label>
-                    <textarea id="product-description" name="description" class="pf-input" style="min-height:110px;">{{ old('description',$product->description) }}</textarea>
-                </div>
-                <div class="pf-field">
-                    <label class="pf-label" for="product-active-sel">Status</label>
-                    <select id="product-active-sel" name="is_active" class="pf-input" style="max-width:200px;">
-                        <option value="1" @selected(old('is_active',$product->is_active ? '1':'0') === '1')>Active</option>
-                        <option value="0" @selected(old('is_active',$product->is_active ? '1':'0') === '0')>Inactive</option>
-                    </select>
+                    <label class="pf-label" for="product-slug">Slug (URL)</label>
+                    <input id="product-slug" type="text" name="slug" class="pf-input" value="{{ old('slug',$product->slug) }}">
                 </div>
             </div>
         </div>
 
-        {{-- 2. Pricing --}}
+        @include('admin.products._apparel_sections', ['product' => $product])
+
         <div class="pf-card">
             <div class="pf-card-head">
                 <div class="pf-card-num">2</div>
                 <h3 class="pf-card-title">Pricing</h3>
             </div>
             <div class="pf-card-body" style="display:grid;gap:16px;">
-                <div class="pf-grid-3">
+                <div class="pf-grid-4">
                     <div class="pf-field">
-                        <label class="pf-label" for="product-price">Regular Price (KES) <span class="req">*</span></label>
+                        <label class="pf-label" for="product-buying-price">Buying Price</label>
+                        <input id="product-buying-price" type="number" name="buying_price" class="pf-input" step="0.01" min="0" value="{{ old('buying_price', $product->buying_price) }}">
+                    </div>
+                    <div class="pf-field">
+                        <label class="pf-label" for="product-price">Selling Price <span class="req">*</span></label>
                         <input id="product-price" type="number" name="price" class="pf-input @error('price') is-invalid @enderror" step="0.01" min="0" value="{{ old('price',$product->price) }}" required>
                         @error('price')<span class="pf-error">{{ $message }}</span>@enderror
                     </div>
+                    <div class="pf-field">
+                        <label class="pf-label" for="product-wholesale">Wholesale Price</label>
+                        <input id="product-wholesale" type="number" name="wholesale_price" class="pf-input" step="0.01" min="0" value="{{ old('wholesale_price', $product->wholesale_price) }}">
+                    </div>
+                    <div class="pf-field">
+                        <label class="pf-label" for="product-tax">Tax Rate %</label>
+                        <input id="product-tax" type="number" name="tax_rate" class="pf-input" step="0.01" min="0" max="100" value="{{ old('tax_rate', $product->tax_rate ?? 16) }}">
+                    </div>
+                </div>
+                <div class="pf-grid-2">
                     <div class="pf-field">
                         <label class="pf-label" for="product-discount-percent">Discount (%)</label>
                         <div class="pf-input-wrap">
@@ -157,56 +209,33 @@ textarea.pf-input { resize:vertical; min-height:90px; }
                         @error('sale_price')<span class="pf-error">{{ $message }}</span>@enderror
                     </div>
                 </div>
-                <div class="pf-sale-notice">
-                    <span>Sale Price = Regular Price − Discount %</span>
-                    <span>You save: <strong id="pf-you-save">KES {{ number_format((float)$product->price - (float)($product->sale_price ?? $product->price), 2) }}</strong></span>
-                </div>
             </div>
         </div>
 
-        {{-- 3. Inventory --}}
-        <div class="pf-card">
+        <div class="pf-card" id="stock-adjust">
             <div class="pf-card-head">
                 <div class="pf-card-num">3</div>
                 <h3 class="pf-card-title">Inventory</h3>
             </div>
             <div class="pf-card-body" style="display:grid;gap:16px;">
-                <div class="pf-grid-2">
-                    <div class="pf-field">
-                        <label class="pf-label" for="product-sku">SKU</label>
-                        <input id="product-sku" type="text" name="sku" class="pf-input @error('sku') is-invalid @enderror" value="{{ old('sku',$product->sku) }}">
-                        @error('sku')<span class="pf-error">{{ $message }}</span>@enderror
-                    </div>
-                    <div class="pf-field">
-                        <label class="pf-label" for="product-barcode">Barcode</label>
-                        <input id="product-barcode" type="text" name="barcode" class="pf-input @error('barcode') is-invalid @enderror" value="{{ old('barcode',$product->barcode) }}" maxlength="64" inputmode="numeric">
-                        @error('barcode')<span class="pf-error">{{ $message }}</span>@enderror
-                    </div>
-                </div>
-                <div class="pf-field">
-                    <label class="pf-label" for="product-stock">Stock Quantity <span class="req">*</span></label>
-                    <div class="pf-stepper" style="max-width:180px;">
-                        <button type="button" onclick="stepStock(-1)">−</button>
-                        <input id="product-stock" type="number" name="stock" value="{{ old('stock',$product->stock) }}" min="0" required>
-                        <button type="button" onclick="stepStock(1)">+</button>
-                    </div>
-                    @error('stock')<span class="pf-error">{{ $message }}</span>@enderror
-                </div>
+                @include('admin.products._location_stock', ['product' => $product, 'stockLocations' => $stockLocations ?? \App\Models\StockLocation::orderedActive()])
+                @if($product->usesVariants())
+                    <p class="pf-help" style="margin:0;">This product uses variants — manage Store / Shop quantities in the Variants table below.</p>
+                @endif
             </div>
         </div>
 
-        {{-- 4. Image --}}
         <div class="pf-card">
             <div class="pf-card-head">
                 <div class="pf-card-num">4</div>
-                <h3 class="pf-card-title">Product Image</h3>
+                <h3 class="pf-card-title">Product Details</h3>
             </div>
-            <div class="pf-card-body">
+            <div class="pf-card-body" style="display:grid;gap:16px;">
                 <div class="pf-grid-2">
                     <label class="pf-upload-zone" for="product-image-file">
                         <svg width="36" height="36" fill="none" stroke="#d4af37" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"/></svg>
                         <div style="font-size:13.5px;font-weight:700;margin-top:8px;">Drag &amp; drop or <span style="color:#d4af37;text-decoration:underline;">click to browse</span></div>
-                        <div style="font-size:11px;color:#9ca3af;margin-top:4px;">PNG, JPG, WEBP up to 5MB</div>
+                        <div style="font-size:11px;color:#9ca3af;margin-top:4px;">JPG, PNG or WebP up to 2MB</div>
                         <input id="product-image-file" type="file" name="image_file" accept="image/*" style="display:none;">
                     </label>
                     <div>
@@ -215,18 +244,26 @@ textarea.pf-input { resize:vertical; min-height:90px; }
                             @if($product->image_url)
                                 <img src="{{ $product->image_url }}" alt="{{ $product->name }}" style="width:100%;height:160px;object-fit:cover;border-radius:12px;">
                             @else
-                                <div class="pf-img-placeholder">
-                                    <svg width="36" height="36" fill="none" stroke="#d1d5db" stroke-width="1.5" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.5"/><path stroke-linecap="round" d="M21 15l-5-5L5 21"/></svg>
-                                    <div style="margin-top:6px;">No image</div>
-                                </div>
+                                <div class="pf-img-placeholder">No image</div>
                             @endif
                         </div>
                     </div>
                 </div>
-                <div class="pf-field" style="margin-top:12px;">
+                <div class="pf-field">
                     <label class="pf-label" for="product-image-url">Or paste image URL</label>
                     <input id="product-image-url" type="url" name="image_url" class="pf-input @error('image_url') is-invalid @enderror" value="{{ old('image_url',$product->image_url) }}" placeholder="https://...">
                     @error('image_url')<span class="pf-error">{{ $message }}</span>@enderror
+                </div>
+                <div class="pf-field">
+                    <label class="pf-label" for="product-description">Description</label>
+                    <textarea id="product-description" name="description" class="pf-input" style="min-height:110px;">{{ old('description',$product->description) }}</textarea>
+                </div>
+                <div class="pf-field" style="max-width:200px;">
+                    <label class="pf-label" for="product-active-sel">Active</label>
+                    <select id="product-active-sel" name="is_active" class="pf-input">
+                        <option value="1" @selected(old('is_active',$product->is_active ? '1':'0') === '1')>Active</option>
+                        <option value="0" @selected(old('is_active',$product->is_active ? '1':'0') === '0')>Inactive</option>
+                    </select>
                 </div>
             </div>
         </div>
@@ -352,5 +389,20 @@ textarea.pf-input { resize:vertical; min-height:90px; }
     update();
 })();
 function stepStock(d){ const el=document.getElementById('product-stock'); if(!el)return; el.value=Math.max(0,(parseInt(el.value)||0)+d); el.dispatchEvent(new Event('input')); }
+async function generateSku() {
+    const el = document.getElementById('product-sku');
+    if (!el) return;
+    const name = document.getElementById('product-name')?.value || 'PROD';
+    try {
+        const res = await fetch('{{ route('admin.products.generate-sku') }}?name=' + encodeURIComponent(name), {
+            headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
+        });
+        const data = await res.json();
+        if (data.sku) { el.value = data.sku; el.dispatchEvent(new Event('input')); }
+    } catch (e) {
+        el.value = 'SKU-' + Date.now().toString().slice(-8);
+        el.dispatchEvent(new Event('input'));
+    }
+}
 </script>
 @endsection

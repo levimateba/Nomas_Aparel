@@ -27,7 +27,7 @@ class HomeController extends Controller
             })
             ->where('is_active', true)
             ->latest()
-            ->limit(12)
+            ->limit(24)
             ->get();
         $categories = Category::query()
             ->where('is_active', true)
@@ -39,11 +39,12 @@ class HomeController extends Controller
             ->whereNotNull('sale_price')
             ->whereColumn('sale_price', '<', 'price')
             ->latest()
-            ->limit(6)
+            ->limit(12)
             ->get();
         $heroImages = Product::query()
             ->where('is_active', true)
             ->whereNotNull('image_url')
+            ->where('image_url', '!=', '')
             ->latest()
             ->limit(5)
             ->pluck('image_url');

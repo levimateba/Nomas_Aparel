@@ -8,8 +8,10 @@ use App\Models\Coupon;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Product;
+use App\Models\ProductVariant;
 use App\Models\AbandonedCart;
 use App\Services\Payments\PaymentGatewayService;
+use App\Services\ProductVariantService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Schema;
@@ -59,20 +61,49 @@ class CartController extends Controller
 
     public function add(Request $request, Product $product): RedirectResponse
     {
-        $qty = max(1, (int) $request->input('qty', 1));
-        $price = (float) ($product->sale_price ?: $product->price);
+        if ($product->store_visibility === 'hidden' || ! ($product->allow_online_purchase ?? true)) {
+            return back()->withErrors(['cart' => 'This product is not available for online purchase.']);
+        }
 
+        $qty = max(1, (int) $request->input('qty', 1));
+        $variant = null;
+        if ($request->filled('variant_id') && Schema::hasTable('product_variants')) {
+            $variant = ProductVariant::query()
+                ->where('product_id', $product->id)
+                ->whereKey((int) $request->input('variant_id'))
+                ->where('is_active', true)
+                ->first();
+        }
+
+        if ($product->usesVariants() && ! $variant) {
+            return back()->withErrors(['cart' => 'Please select a size / colour variant.']);
+        }
+
+        $inventory = app(\App\Services\InventoryStockService::class);
+        $available = $inventory->onlineAvailableStock($product, $variant);
         $cart = session('cart', []);
-        $key = (string) $product->id;
+        $key = $variant ? 'v'.$variant->id : 'p'.$product->id;
+        $nextQty = ($cart[$key]['qty'] ?? 0) + $qty;
+        if ($nextQty > $available && ! ($product->allow_backorders ?? false)) {
+            return back()->withErrors([
+                'cart' => 'Only '.$available.' units available online for '.($variant ? $variant->displayName() : $product->name).'.',
+            ]);
+        }
+
+        $price = $variant
+            ? $variant->currentPrice()
+            : (float) ($product->sale_price ?: $product->price);
 
         if (isset($cart[$key])) {
             $cart[$key]['qty'] += $qty;
         } else {
             $cart[$key] = [
                 'product_id' => $product->id,
-                'name' => $product->name,
+                'product_variant_id' => $variant?->id,
+                'name' => $variant ? $variant->displayName() : $product->name,
+                'sku' => $variant?->sku ?: $product->sku,
                 'price' => $price,
-                'image_url' => $product->image_url,
+                'image_url' => $variant?->image_url ?: $product->image_url,
                 'qty' => $qty,
             ];
         }
@@ -83,14 +114,13 @@ class CartController extends Controller
         return back()->with('success', 'Product added to cart.');
     }
 
-    public function update(Request $request, Product $product): RedirectResponse
+    public function update(Request $request, string $lineKey): RedirectResponse
     {
         $qty = max(1, (int) $request->input('qty', 1));
         $cart = session('cart', []);
-        $key = (string) $product->id;
 
-        if (isset($cart[$key])) {
-            $cart[$key]['qty'] = $qty;
+        if (isset($cart[$lineKey])) {
+            $cart[$lineKey]['qty'] = $qty;
             session(['cart' => $cart]);
             $this->syncAbandonedCart($cart);
         }
@@ -98,10 +128,10 @@ class CartController extends Controller
         return back()->with('success', 'Cart updated.');
     }
 
-    public function remove(Product $product): RedirectResponse
+    public function remove(string $lineKey): RedirectResponse
     {
         $cart = session('cart', []);
-        unset($cart[(string) $product->id]);
+        unset($cart[$lineKey]);
         session(['cart' => $cart]);
         $this->syncAbandonedCart($cart);
 
@@ -118,6 +148,12 @@ class CartController extends Controller
 
     public function checkout(): View|RedirectResponse
     {
+        if (! auth()->check()) {
+            return redirect()
+                ->route('login', ['redirect' => 'checkout'])
+                ->with('error', 'Please login or create an account to checkout.');
+        }
+
         $cart = session('cart', []);
         if (empty($cart)) {
             return redirect()->route('shop.index')->with('success', 'Your cart is empty.');
@@ -130,6 +166,12 @@ class CartController extends Controller
 
     public function placeOrder(Request $request): RedirectResponse
     {
+        if (! auth()->check()) {
+            return redirect()
+                ->route('login', ['redirect' => 'checkout'])
+                ->with('error', 'Please login or create an account to place an order.');
+        }
+
         $cart = session('cart', []);
         if (empty($cart)) {
             return redirect()->route('shop.index')->with('success', 'Your cart is empty.');
@@ -149,6 +191,7 @@ class CartController extends Controller
         $orderNumber = 'ORD-' . now()->format('YmdHis') . '-' . random_int(100, 999);
 
         $order = DB::transaction(function () use ($data, $cart, $total, $orderNumber, $totals) {
+            $settings = \App\Models\Setting::get_settings();
             $payload = [
                 'order_number' => $orderNumber,
                 'user_id' => auth()->id(),
@@ -187,20 +230,52 @@ class CartController extends Controller
                     abort(422, 'One or more products are no longer available.');
                 }
 
-                if ($product->stock < $item['qty']) {
-                    abort(422, 'Insufficient stock for ' . $product->name . '.');
+                $variant = null;
+                if (! empty($item['product_variant_id']) && Schema::hasTable('product_variants')) {
+                    $variant = ProductVariant::query()->lockForUpdate()->find($item['product_variant_id']);
+                    if (! $variant || ! $variant->is_active) {
+                        abort(422, 'One or more variants are no longer available.');
+                    }
+                } elseif ($product->usesVariants()) {
+                    abort(422, $product->name.' requires a selected variant.');
                 }
 
-                $product->decrement('stock', $item['qty']);
+                $stockService = app(ProductVariantService::class);
+                $inventory = app(\App\Services\InventoryStockService::class);
+                $available = $inventory->onlineAvailableStock($product, $variant, $settings);
+                if ($available < $item['qty'] && ! ($product->allow_backorders ?? false)) {
+                    abort(422, 'Only '.$available.' units available online for '.($item['name'] ?? $product->name).'.');
+                }
 
-                OrderItem::create([
+                $payload = [
                     'order_id' => $createdOrder->id,
                     'product_id' => $item['product_id'],
                     'product_name' => $item['name'],
                     'unit_price' => $item['price'],
                     'quantity' => $item['qty'],
                     'line_total' => $item['price'] * $item['qty'],
-                ]);
+                ];
+                if (Schema::hasColumn('order_items', 'product_variant_id')) {
+                    $payload['product_variant_id'] = $variant?->id;
+                }
+                if (Schema::hasColumn('order_items', 'variant_name')) {
+                    $payload['variant_name'] = $variant?->name;
+                }
+                if (Schema::hasColumn('order_items', 'sku')) {
+                    $payload['sku'] = $item['sku'] ?? $variant?->sku ?? $product->sku;
+                }
+
+                $orderItem = OrderItem::create($payload);
+
+                $inventory->fulfilOnlineSale(
+                    $product,
+                    $variant,
+                    (int) $item['qty'],
+                    $createdOrder,
+                    $orderItem,
+                    $settings,
+                    (bool) ($product->allow_backorders ?? false)
+                );
             }
 
             if (!empty($totals['coupon_code'])) {

@@ -4,10 +4,16 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Invoice {{ $order->order_number }}</title>
+    @php
+        $logoSrc = $settings->logoDataUri() ?: $settings->logo;
+        $showLogo = $settings->hasLogoFile() && $logoSrc;
+    @endphp
     <style>
         body { font-family: Arial, sans-serif; margin: 20px; color: #111827; }
-        .top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 18px; }
-        .brand { font-size: 24px; font-weight: 700; color: #16456e; }
+        .top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 18px; gap: 16px; }
+        .brand-wrap { display: flex; align-items: center; gap: 14px; }
+        .brand-logo { max-height: 64px; max-width: 160px; object-fit: contain; display: block; }
+        .brand { font-size: 24px; font-weight: 700; color: #a58112; }
         .muted { color: #6b7280; font-size: 13px; }
         .block { border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px; margin-bottom: 12px; }
         table { width: 100%; border-collapse: collapse; }
@@ -15,7 +21,7 @@
         th { background: #f9fafb; }
         .right { text-align: right; }
         .actions { margin: 12px 0 18px; display: flex; gap: 8px; }
-        .btn { display: inline-block; padding: 8px 12px; border-radius: 6px; text-decoration: none; color: #fff; background: #16456e; }
+        .btn { display: inline-block; padding: 8px 12px; border-radius: 6px; text-decoration: none; color: #111; background: #a58112; font-weight: 700; }
         @media print { .actions { display: none; } }
     </style>
 </head>
@@ -26,9 +32,19 @@
     </div>
 
     <div class="top">
-        <div>
-            <div class="brand">{{ $settings->site_name ?? 'Store' }}</div>
-            <div class="muted">{{ $settings->site_tagline ?? 'Marketplace' }}</div>
+        <div class="brand-wrap">
+            @if($showLogo)
+                <img class="brand-logo" src="{{ $logoSrc }}" alt="{{ $settings->site_name ?? 'Store' }}">
+            @endif
+            <div>
+                <div class="brand">{{ $settings->trading_name ?: ($settings->site_name ?? 'Store') }}</div>
+                <div class="muted">{{ $settings->site_tagline ?? '' }}</div>
+                @if($settings->address || $settings->phone || $settings->email)
+                    <div class="muted" style="margin-top:4px;">
+                        {{ collect([$settings->address, $settings->city, $settings->phone, $settings->email])->filter()->implode(' · ') }}
+                    </div>
+                @endif
+            </div>
         </div>
         <div class="right">
             <div><strong>Invoice</strong></div>
