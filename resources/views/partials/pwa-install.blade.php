@@ -17,13 +17,13 @@
         position: fixed;
         left: 12px;
         right: 12px;
-        bottom: 12px;
-        z-index: 2000;
+        bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+        z-index: 100000;
         display: none;
+        flex-direction: column;
+        gap: 12px;
         border-radius: 16px;
         padding: 14px 16px;
-        gap: 12px;
-        align-items: center;
         @if($pwaIsAdmin)
         background: #121212;
         border: 1px solid rgba(212, 175, 55, 0.25);
@@ -35,6 +35,12 @@
         @endif
     }
     #pwa-install-banner{{ $pwaSuffix }}.is-visible { display: flex; }
+    #pwa-install-banner{{ $pwaSuffix }} .pwa-top {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        min-width: 0;
+    }
     #pwa-install-banner{{ $pwaSuffix }} .pwa-icon {
         width: 48px;
         height: 48px;
@@ -57,19 +63,20 @@
         color: {{ $pwaIsAdmin ? 'rgba(255,255,255,0.72)' : '#64748b' }};
     }
     #pwa-install-banner{{ $pwaSuffix }} .pwa-actions {
-        display: flex;
-        flex-direction: column;
-        gap: 6px;
-        flex-shrink: 0;
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 8px;
+        align-items: center;
     }
     #pwa-install-banner{{ $pwaSuffix }} .pwa-install-btn {
         border: 0;
-        border-radius: 999px;
-        padding: 8px 14px;
-        font-size: 12px;
-        font-weight: 700;
+        border-radius: 12px;
+        padding: 12px 16px;
+        font-size: 14px;
+        font-weight: 800;
         cursor: pointer;
         white-space: nowrap;
+        width: 100%;
         @if($pwaIsAdmin)
         background: #d4af37;
         color: #121212;
@@ -81,37 +88,37 @@
     #pwa-install-banner{{ $pwaSuffix }} .pwa-dismiss-btn {
         background: transparent;
         border: 0;
-        font-size: 11px;
+        font-size: 13px;
         font-weight: 600;
         cursor: pointer;
-        padding: 2px 0;
-        color: {{ $pwaIsAdmin ? 'rgba(255,255,255,0.55)' : '#64748b' }};
+        padding: 12px 10px;
+        white-space: nowrap;
+        color: {{ $pwaIsAdmin ? 'rgba(255,255,255,0.65)' : '#64748b' }};
     }
-    @media (max-width: 575.98px) {
+    @media (max-width: 1279.98px) {
         #pwa-install-banner{{ $pwaSuffix }} {
-            flex-direction: column;
-            align-items: stretch;
-            text-align: center;
+            /* Sit above TailAdmin mobile bottom nav (~4.25rem) */
+            bottom: calc(4.25rem + 16px + env(safe-area-inset-bottom, 0px));
         }
-        #pwa-install-banner{{ $pwaSuffix }} .pwa-icon { margin: 0 auto; }
-        #pwa-install-banner{{ $pwaSuffix }} .pwa-actions { flex-direction: row; justify-content: center; }
     }
 </style>
 
 <div id="pwa-install-banner{{ $pwaSuffix }}" role="dialog" aria-live="polite" aria-label="Install app">
-    <img
-        class="pwa-icon"
-        src="{{ $pwaBannerIcon }}"
-        alt="{{ $pwaSiteName }}"
-        width="48"
-        height="48"
-    >
-    <div class="pwa-copy">
-        <strong>{{ $pwaTitle }}</strong>
-        <span id="pwa-install-text{{ $pwaSuffix }}">{{ $pwaText }}</span>
+    <div class="pwa-top">
+        <img
+            class="pwa-icon"
+            src="{{ $pwaBannerIcon }}"
+            alt="{{ $pwaSiteName }}"
+            width="48"
+            height="48"
+        >
+        <div class="pwa-copy">
+            <strong>{{ $pwaTitle }}</strong>
+            <span id="pwa-install-text{{ $pwaSuffix }}">{{ $pwaText }}</span>
+        </div>
     </div>
     <div class="pwa-actions">
-        <button type="button" class="pwa-install-btn" id="pwa-install-btn{{ $pwaSuffix }}">Install App</button>
+        <button type="button" class="pwa-install-btn" id="pwa-install-btn{{ $pwaSuffix }}">Install</button>
         <button type="button" class="pwa-dismiss-btn" id="pwa-dismiss-btn{{ $pwaSuffix }}">Not now</button>
     </div>
 </div>
@@ -131,6 +138,7 @@
     const swScope = @json($pwaScope);
     const dismissDays = 14;
     let deferredPrompt = null;
+    let mode = 'android';
 
     function isStandalone() {
         return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
@@ -148,14 +156,21 @@
         return (Date.now() - dismissedAt) < (dismissDays * 24 * 60 * 60 * 1000);
     }
 
-    function showBanner(mode) {
+    function showBanner(nextMode) {
         if (!banner || isStandalone() || wasDismissedRecently()) {
             return;
         }
 
+        mode = nextMode || mode;
+
         if (mode === 'ios') {
-            installText.textContent = 'Tap Share, then "Add to Home Screen" to install the app.';
+            installText.textContent = 'Tap Share, then “Add to Home Screen”.';
             installBtn.textContent = 'How to install';
+        } else if (mode === 'manual') {
+            installText.textContent = 'Open browser menu → “Add to Home screen” / “Install app”.';
+            installBtn.textContent = 'How to install';
+        } else {
+            installBtn.textContent = 'Install';
         }
 
         banner.classList.add('is-visible');
@@ -180,9 +195,12 @@
             return;
         }
 
-        if (/iPad|iPhone|iPod/.test(navigator.userAgent)) {
-            alert('Tap the Share button in Safari, then choose "Add to Home Screen".');
+        if (mode === 'ios' || /iPad|iPhone|iPod/.test(navigator.userAgent)) {
+            alert('Tap the Share button in Safari, then choose “Add to Home Screen”.');
+            return;
         }
+
+        alert('Open your browser menu and choose “Install app” or “Add to Home screen”.');
     });
 
     dismissBtn?.addEventListener('click', function () {
@@ -193,12 +211,19 @@
     navigator.serviceWorker.register(@json(url('/sw.js')), { scope: swScope }).catch(function () {});
 
     const isIos = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
-    if (isIos && !isStandalone() && !wasDismissedRecently()) {
+    const isMobile = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+
+    if (!isStandalone() && !wasDismissedRecently()) {
         window.setTimeout(function () {
-            if (!deferredPrompt) {
-                showBanner('ios');
+            if (deferredPrompt) {
+                return;
             }
-        }, 4000);
+            if (isIos) {
+                showBanner('ios');
+            } else if (isMobile) {
+                showBanner('manual');
+            }
+        }, 2500);
     }
 })();
 </script>

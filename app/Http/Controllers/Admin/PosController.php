@@ -15,6 +15,7 @@ use App\Services\CashierShiftService;
 use App\Services\LoyaltyService;
 use App\Services\ProductVariantService;
 use App\Support\Audit;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -111,7 +112,7 @@ class PosController extends Controller
             if ($posCustomer && $loyaltyCard && $loyaltySettings->show_estimated_points_on_pos) {
                 $eligible = $loyaltyService->getEligibleAmount(
                     (float) $totals['subtotal'],
-                    (float) $totals['coupon_discount'],
+                    (float) ($totals['coupon_discount'] ?? 0) + (float) ($totals['sale_discount'] ?? 0),
                     (float) $totals['loyalty_discount']
                 );
                 $estimatedPoints = $loyaltyService->calculateEarnedPoints($eligible);
@@ -148,6 +149,8 @@ class PosController extends Controller
             'estimatedPoints' => $estimatedPoints,
             'customerSearch' => $customerSearch,
             'customerResults' => $customerResults,
+            'priceMode' => $this->priceMode(),
+            'saleDiscount' => (float) session('pos_sale_discount', 0),
         ]);
     }
 
@@ -232,9 +235,66 @@ class PosController extends Controller
 
     public function clear(): RedirectResponse
     {
-        session()->forget(['pos_cart', 'pos_coupon', 'pos_shop_customer_id', 'pos_loyalty_redeem_points']);
+        session()->forget([
+            'pos_cart',
+            'pos_coupon',
+            'pos_shop_customer_id',
+            'pos_loyalty_redeem_points',
+            'pos_sale_discount',
+            'pos_price_mode',
+        ]);
 
         return back()->with('success', 'Sale cleared.');
+    }
+
+    public function setPriceMode(Request $request): RedirectResponse
+    {
+        $data = $request->validate([
+            'price_mode' => ['required', 'in:retail,wholesale'],
+        ]);
+
+        session(['pos_price_mode' => $data['price_mode']]);
+        $this->repriceCart();
+
+        return back()->with('success', $data['price_mode'] === 'wholesale'
+            ? 'Wholesale pricing applied.'
+            : 'Retail pricing applied.');
+    }
+
+    public function applySaleDiscount(Request $request): RedirectResponse
+    {
+        $data = $request->validate([
+            'discount_type' => ['required', 'in:amount,percent'],
+            'discount_value' => ['required', 'numeric', 'min:0'],
+        ]);
+
+        $cart = session('pos_cart', []);
+        $subtotal = (float) collect($cart)->sum(fn ($item) => ((float) $item['price']) * ((int) $item['qty']));
+        if ($subtotal <= 0) {
+            return back()->withErrors(['discount_value' => 'Add items before applying a discount.']);
+        }
+
+        $value = (float) $data['discount_value'];
+        $amount = $data['discount_type'] === 'percent'
+            ? round($subtotal * min($value, 100) / 100, 2)
+            : round($value, 2);
+
+        if ($amount <= 0) {
+            session()->forget('pos_sale_discount');
+
+            return back()->with('success', 'Discount cleared.');
+        }
+
+        session(['pos_sale_discount' => min($amount, $subtotal)]);
+
+        return back()->with('success', 'Discount of KES '.number_format(min($amount, $subtotal), 2).' applied.');
+    }
+
+    public function removeSaleDiscount(): RedirectResponse
+    {
+        session()->forget('pos_sale_discount');
+
+        return back()->with('success', 'Discount removed.');
     }
 
     public function selectCustomer(Request $request): RedirectResponse
@@ -431,7 +491,10 @@ class PosController extends Controller
                 $payload['source'] = 'pos';
             }
             if (Schema::hasColumn('orders', 'discount_amount')) {
-                $payload['discount_amount'] = $totals['coupon_discount'];
+                $payload['discount_amount'] = round(
+                    (float) ($totals['coupon_discount'] ?? 0) + (float) ($totals['sale_discount'] ?? 0),
+                    2
+                );
             }
             if (Schema::hasColumn('orders', 'tax_amount')) {
                 $payload['tax_amount'] = $totals['tax'] ?? 0;
@@ -550,7 +613,7 @@ class PosController extends Controller
 
                 $eligible = $loyalty->getEligibleAmount(
                     (float) $totals['subtotal'],
-                    (float) $totals['coupon_discount'],
+                    (float) ($totals['coupon_discount'] ?? 0) + (float) ($totals['sale_discount'] ?? 0),
                     $loyaltyDiscount
                 );
                 $earned = $loyalty->calculateEarnedPoints($eligible);
@@ -565,7 +628,14 @@ class PosController extends Controller
             return $created->fresh();
         });
 
-        session()->forget(['pos_cart', 'pos_coupon', 'pos_shop_customer_id', 'pos_loyalty_redeem_points']);
+        session()->forget([
+            'pos_cart',
+            'pos_coupon',
+            'pos_shop_customer_id',
+            'pos_loyalty_redeem_points',
+            'pos_sale_discount',
+            'pos_price_mode',
+        ]);
 
         Audit::log(
             'sale_created',
@@ -613,6 +683,81 @@ class PosController extends Controller
         $loyaltySettings = app(LoyaltyService::class)->settings();
 
         return view('admin.pos.receipt', compact('order', 'loyaltySettings'));
+    }
+
+    public function receiptPdf(Order $order)
+    {
+        $isPos = str_starts_with((string) $order->order_number, 'POS-')
+            || (Schema::hasColumn('orders', 'source') && $order->source === 'pos');
+
+        abort_unless($isPos, 404);
+
+        $order->load(['items']);
+        $settings = Setting::get_settings();
+
+        $pdf = Pdf::loadView('admin.pos.receipt-pdf', [
+            'order' => $order,
+            'settings' => $settings,
+        ])->setPaper([0, 0, 226.77, 841.89], 'portrait'); // ~80mm thermal width
+
+        $filename = 'receipt-'.$order->order_number.'.pdf';
+
+        if (request()->boolean('download')) {
+            return $pdf->download($filename);
+        }
+
+        return $pdf->stream($filename);
+    }
+
+    private function priceMode(): string
+    {
+        $mode = (string) session('pos_price_mode', 'retail');
+
+        return in_array($mode, ['retail', 'wholesale'], true) ? $mode : 'retail';
+    }
+
+    private function unitPrices(Product $product, ?ProductVariant $variant = null): array
+    {
+        $retail = $variant ? $variant->currentPrice() : $product->currentPrice();
+        $wholesaleRaw = $variant
+            ? (is_numeric($variant->wholesale_price) ? (float) $variant->wholesale_price : 0.0)
+            : (is_numeric($product->wholesale_price) ? (float) $product->wholesale_price : 0.0);
+        $wholesale = $wholesaleRaw > 0 ? $wholesaleRaw : $retail;
+
+        return [
+            'retail_price' => $retail,
+            'wholesale_price' => $wholesale,
+        ];
+    }
+
+    private function priceForMode(array $prices, ?string $mode = null): float
+    {
+        $mode = $mode ?? $this->priceMode();
+
+        return $mode === 'wholesale'
+            ? (float) $prices['wholesale_price']
+            : (float) $prices['retail_price'];
+    }
+
+    private function repriceCart(): void
+    {
+        $cart = session('pos_cart', []);
+        if ($cart === []) {
+            return;
+        }
+
+        $mode = $this->priceMode();
+        foreach ($cart as $key => $item) {
+            $retail = (float) ($item['retail_price'] ?? $item['price'] ?? 0);
+            $wholesale = (float) ($item['wholesale_price'] ?? $retail);
+            $cart[$key]['retail_price'] = $retail;
+            $cart[$key]['wholesale_price'] = $wholesale > 0 ? $wholesale : $retail;
+            $cart[$key]['price'] = $mode === 'wholesale'
+                ? $cart[$key]['wholesale_price']
+                : $cart[$key]['retail_price'];
+        }
+
+        session(['pos_cart' => $cart]);
     }
 
     private function addProductToCart(Product $product, int $qty, ?ProductVariant $variant = null): ?string
@@ -667,12 +812,16 @@ class PosController extends Controller
             return 'Only '.$available.' left at '.$locName.' for '.($variant ? $variant->displayName() : $product->name).'.';
         }
 
+        $prices = $this->unitPrices($product, $variant);
+
         $cart[$key] = [
             'product_id' => $product->id,
             'product_variant_id' => $variant?->id,
             'name' => $variant ? $variant->displayName() : $product->name,
             'sku' => $variant?->sku ?: $product->sku,
-            'price' => $variant ? $variant->currentPrice() : $product->currentPrice(),
+            'retail_price' => $prices['retail_price'],
+            'wholesale_price' => $prices['wholesale_price'],
+            'price' => $this->priceForMode($prices),
             'tax_rate' => $variant && is_numeric($variant->tax_rate)
                 ? (float) $variant->tax_rate
                 : (is_numeric($product->tax_rate) ? (float) $product->tax_rate : null),
@@ -711,7 +860,8 @@ class PosController extends Controller
             }
         }
 
-        $afterCoupon = max($subtotal - $couponDiscount, 0);
+        $saleDiscount = min((float) session('pos_sale_discount', 0), max($subtotal - $couponDiscount, 0));
+        $afterCoupon = max($subtotal - $couponDiscount - $saleDiscount, 0);
         $loyaltyDiscount = 0.0;
         $loyaltyPointsRedeemed = 0;
 
@@ -730,7 +880,7 @@ class PosController extends Controller
             }
         }
 
-        $discount = round($couponDiscount + $loyaltyDiscount, 2);
+        $discount = round($couponDiscount + $saleDiscount + $loyaltyDiscount, 2);
         $afterDiscount = max($subtotal - $discount, 0);
 
         $tax = 0.0;
@@ -748,6 +898,7 @@ class PosController extends Controller
         return [
             'subtotal' => $subtotal,
             'coupon_discount' => $couponDiscount,
+            'sale_discount' => $saleDiscount,
             'loyalty_discount' => $loyaltyDiscount,
             'loyalty_points_redeemed' => $loyaltyPointsRedeemed,
             'discount' => $discount,
@@ -757,6 +908,7 @@ class PosController extends Controller
             'tax_label' => $settings->taxReceiptLabel(),
             'total' => $total,
             'coupon_code' => $couponCode,
+            'price_mode' => $this->priceMode(),
             'count' => (int) collect($cart)->sum('qty'),
         ];
     }

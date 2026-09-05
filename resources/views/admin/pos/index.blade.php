@@ -516,7 +516,13 @@
         gap: 8px;
         margin-bottom: 10px;
     }
-    .pay-pill {
+    .price-pills {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
+        margin-bottom: 8px;
+    }
+    .pay-pill, .price-pill {
         appearance: none;
         border: 1px solid #e5e7eb;
         background: #fff;
@@ -530,7 +536,7 @@
         text-align: center;
         transition: background .12s ease, border-color .12s ease, color .12s ease;
     }
-    .pay-pill.on {
+    .pay-pill.on, .price-pill.on {
         background: #a58112;
         border-color: #a58112;
         color: #111;
@@ -870,6 +876,49 @@
         </div>
 
         <div class="cs-cart-foot">
+        @php $priceMode = $priceMode ?? ($totals['price_mode'] ?? 'retail'); @endphp
+        <div class="cs-section" style="margin-bottom:10px;">
+            <p class="cs-section-label">Pricing</p>
+            <div class="price-pills" role="group" aria-label="Price mode">
+                <form method="POST" action="{{ route('admin.pos.price-mode') }}" style="display:contents;">
+                    @csrf
+                    <input type="hidden" name="price_mode" value="retail">
+                    <button type="submit" class="price-pill {{ $priceMode === 'retail' ? 'on' : '' }}">Retail</button>
+                </form>
+                <form method="POST" action="{{ route('admin.pos.price-mode') }}" style="display:contents;">
+                    @csrf
+                    <input type="hidden" name="price_mode" value="wholesale">
+                    <button type="submit" class="price-pill {{ $priceMode === 'wholesale' ? 'on' : '' }}">Wholesale</button>
+                </form>
+            </div>
+            @if($priceMode === 'wholesale')
+                <small class="cs-hint">Cart prices use wholesale (falls back to retail if unset).</small>
+            @endif
+        </div>
+
+        @if(($totals['sale_discount'] ?? 0) > 0)
+            <div class="cs-coupon-applied">
+                <span>Discount −KES {{ number_format($totals['sale_discount'], 2) }}</span>
+                <form method="POST" action="{{ route('admin.pos.discount.remove') }}">
+                    @csrf
+                    <button type="submit">Remove</button>
+                </form>
+            </div>
+        @else
+            <form method="POST" action="{{ route('admin.pos.discount.apply') }}" class="cs-coupon" style="grid-template-columns: auto minmax(0,1fr) auto;">
+                @csrf
+                <select name="discount_type" aria-label="Discount type" style="border:1.5px solid #e5e7eb;border-radius:12px;padding:0 10px;background:#fff;font:inherit;font-size:13px;font-weight:700;">
+                    <option value="amount">KES</option>
+                    <option value="percent">%</option>
+                </select>
+                <label class="cs-coupon-field">
+                    <span aria-hidden="true">−</span>
+                    <input type="number" name="discount_value" min="0" step="0.01" placeholder="Discount">
+                </label>
+                <button class="cs-apply" type="submit">Apply</button>
+            </form>
+        @endif
+
         @if($totals['coupon_code'])
             <div class="cs-coupon-applied">
                 <span>Coupon {{ $totals['coupon_code'] }} applied</span>
@@ -895,18 +944,19 @@
                 <strong>{{ $totals['count'] }}</strong>
             </div>
             <div class="cs-summary-row">
-                <span>Subtotal</span>
+                <span>Subtotal {{ $priceMode === 'wholesale' ? '(wholesale)' : '(retail)' }}</span>
                 <strong>KES {{ number_format($totals['subtotal'], 2) }}</strong>
             </div>
+            @if(($totals['sale_discount'] ?? 0) > 0)
+                <div class="cs-summary-row">
+                    <span>Sale Discount</span>
+                    <strong>- KES {{ number_format($totals['sale_discount'], 2) }}</strong>
+                </div>
+            @endif
             @if(($totals['coupon_discount'] ?? 0) > 0)
                 <div class="cs-summary-row">
                     <span>Coupon Discount</span>
                     <strong>- KES {{ number_format($totals['coupon_discount'], 2) }}</strong>
-                </div>
-            @elseif(($totals['discount'] ?? 0) > 0 && ($totals['loyalty_discount'] ?? 0) <= 0)
-                <div class="cs-summary-row">
-                    <span>Discount</span>
-                    <strong>- KES {{ number_format($totals['discount'], 2) }}</strong>
                 </div>
             @endif
             @if(($totals['loyalty_discount'] ?? 0) > 0)

@@ -137,12 +137,16 @@ Route::middleware(['web'])->group(function () {
         Route::post('/pos/clear', [PosController::class, 'clear'])->name('pos.clear');
         Route::post('/pos/coupon', [PosController::class, 'applyCoupon'])->name('pos.coupon.apply');
         Route::post('/pos/coupon/remove', [PosController::class, 'removeCoupon'])->name('pos.coupon.remove');
+        Route::post('/pos/price-mode', [PosController::class, 'setPriceMode'])->name('pos.price-mode');
+        Route::post('/pos/discount', [PosController::class, 'applySaleDiscount'])->name('pos.discount.apply');
+        Route::post('/pos/discount/remove', [PosController::class, 'removeSaleDiscount'])->name('pos.discount.remove');
         Route::post('/pos/customer', [PosController::class, 'selectCustomer'])->name('pos.customer.select');
         Route::post('/pos/customer/clear', [PosController::class, 'clearCustomer'])->name('pos.customer.clear');
         Route::post('/pos/loyalty/redeem', [PosController::class, 'redeemLoyalty'])->name('pos.loyalty.redeem');
         Route::post('/pos/loyalty/redeem/clear', [PosController::class, 'clearLoyaltyRedeem'])->name('pos.loyalty.redeem.clear');
         Route::post('/pos/charge', [PosController::class, 'charge'])->name('pos.charge');
         Route::get('/pos/receipt/{order}', [PosController::class, 'receipt'])->name('pos.receipt');
+        Route::get('/pos/receipt/{order}/pdf', [PosController::class, 'receiptPdf'])->name('pos.receipt.pdf');
         Route::get('/holds', [HeldSaleController::class, 'index'])->name('holds.index');
         Route::post('/holds', [HeldSaleController::class, 'store'])->name('holds.store');
         Route::post('/holds/{hold}/resume', [HeldSaleController::class, 'resume'])->name('holds.resume');

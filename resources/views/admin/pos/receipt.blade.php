@@ -29,38 +29,7 @@
         $displayNotes = trim(preg_replace('/Cash received:\s*KES\s*[0-9,]+\.\d{2}\.\s*Change:\s*KES\s*[0-9,]+\.\d{2}\.?/is', '', $displayNotes));
     }
     $paymentLabel = ucwords(str_replace('_', ' ', (string) $order->payment_method));
-
-    $shareLines = [
-        '*' . strtoupper($brandName) . ' — Receipt*',
-        'Receipt: ' . $order->order_number,
-        'Date: ' . $order->created_at->format('d M Y H:i'),
-        '',
-    ];
-    foreach ($order->items as $item) {
-        $shareLines[] = '• ' . $item->product_name . ' x' . $item->quantity . ' — KES ' . number_format((float) $item->line_total, 2);
-    }
-    if ((float) ($order->discount_amount ?? 0) > 0) {
-        $shareLines[] = 'Discount: -KES ' . number_format((float) $order->discount_amount, 2);
-    }
-    if ((float) ($order->tax_amount ?? 0) > 0 || ($settings->tax_enabled ?? false)) {
-        $shareLines[] = $settings->taxReceiptLabel() . ': KES ' . number_format((float) ($order->tax_amount ?? 0), 2);
-    }
-    $shareLines[] = '';
-    $shareLines[] = '*TOTAL: KES ' . number_format((float) $order->total_amount, 2) . '*';
-    $shareLines[] = 'Customer: ' . ($order->customer_name ?: 'Walk-in Customer');
-    $shareLines[] = 'Payment: ' . $paymentLabel . ' · Paid';
-    if ($cashReceived !== null) {
-        $shareLines[] = 'Cash received: KES ' . $cashReceived;
-        $shareLines[] = 'Change: KES ' . $cashChange;
-    }
-    if ($phone) {
-        $shareLines[] = 'Store: ' . $phone;
-    }
-    $shareLines[] = '';
-    $shareLines[] = $receiptFooter;
-    $shareText = implode("\n", $shareLines);
-    $whatsAppUrl = 'https://wa.me/?text=' . rawurlencode($shareText);
-    $smsUrl = 'sms:?&body=' . rawurlencode($shareText);
+    $receiptPdfUrl = route('admin.pos.receipt.pdf', $order);
 @endphp
 
 @push('styles')
@@ -117,13 +86,8 @@
     .actions .gold { background: #d4af37; color: #121212; }
     .actions .dark { background: #121212; color: #fff; }
     .actions .ghost { background: #fff; color: #121212; border: 1px solid #d1d5db; }
-    .actions .whatsapp { background: #25d366; color: #fff; }
     .actions .share { background: #1877f2; color: #fff; }
-    .actions .sms { background: #0f766e; color: #fff; }
     .share-note { max-width: 420px; width: 100%; color: #6b7280; font-size: 12px; text-align: center; }
-    @media (min-width: 520px) {
-        .actions { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-    }
     @media print {
         html, body { width: {{ $escpos ? '80mm' : 'auto' }}; background: #fff !important; margin: 0; }
         .receipt-page { padding: 0; display: block; }
@@ -241,12 +205,10 @@
     @endforeach
 
     <p class="print-hint no-print">{{ $escpos ? 'Fits 80mm thermal paper. In the print dialog choose the receipt printer, paper size 80mm, and turn off headers and footers.' : 'A4 / PDF receipt layout is enabled in settings.' }}</p>
-    <p class="share-note no-print">Share this receipt with the customer via WhatsApp, SMS, or other apps.</p>
+    <p class="share-note no-print">Share the receipt PDF via WhatsApp, email, or any app on your device.</p>
     <div class="actions no-print">
         <button class="gold" type="button" onclick="window.print()">Print Receipt</button>
-        <a class="whatsapp" href="{{ $whatsAppUrl }}" target="_blank" rel="noopener">WhatsApp</a>
-        <button class="share" type="button" id="receipt-share-btn">Share</button>
-        <a class="sms" href="{{ $smsUrl }}">SMS</a>
+        <button class="share" type="button" id="receipt-share-btn">Share Receipt</button>
         <a class="dark" href="{{ route('admin.pos.index') }}">New Sale</a>
         <a class="ghost" href="{{ route('admin.orders.show', $order) }}">View Order</a>
     </div>
@@ -254,25 +216,55 @@
 <iframe id="drawer-frame" title="Cash drawer" style="position:absolute;width:0;height:0;border:0;visibility:hidden;"></iframe>
 <script>
 (function () {
-    var text = @json($shareText);
+    var pdfUrl = @json($receiptPdfUrl);
     var title = @json($brandName . ' Receipt ' . $order->order_number);
+    var fileName = @json('receipt-' . $order->order_number . '.pdf');
     var btn = document.getElementById('receipt-share-btn');
+
+    function setBusy(busy) {
+        if (!btn) return;
+        btn.disabled = !!busy;
+        btn.textContent = busy ? 'Preparing…' : 'Share Receipt';
+    }
+
+    async function getReceiptFile() {
+        var res = await fetch(pdfUrl, { credentials: 'same-origin', headers: { 'Accept': 'application/pdf' } });
+        if (!res.ok) {
+            throw new Error('Could not load receipt PDF');
+        }
+        var blob = await res.blob();
+        return new File([blob], fileName, { type: 'application/pdf' });
+    }
+
     if (btn) {
-        btn.addEventListener('click', function () {
-            if (navigator.share) {
-                navigator.share({ title: title, text: text }).catch(function () {});
-                return;
+        btn.addEventListener('click', async function () {
+            setBusy(true);
+            try {
+                var file = await getReceiptFile();
+                if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                    await navigator.share({ files: [file], title: title, text: title });
+                    return;
+                }
+                if (navigator.share) {
+                    await navigator.share({ title: title, text: title, url: pdfUrl });
+                    return;
+                }
+                var link = document.createElement('a');
+                link.href = pdfUrl + (pdfUrl.indexOf('?') >= 0 ? '&' : '?') + 'download=1';
+                link.download = fileName;
+                document.body.appendChild(link);
+                link.click();
+                link.remove();
+                btn.textContent = 'Downloaded';
+                setTimeout(function () { btn.textContent = 'Share Receipt'; }, 1600);
+            } catch (err) {
+                if (err && err.name === 'AbortError') {
+                    return;
+                }
+                window.open(pdfUrl, '_blank');
+            } finally {
+                setBusy(false);
             }
-            if (navigator.clipboard && navigator.clipboard.writeText) {
-                navigator.clipboard.writeText(text).then(function () {
-                    btn.textContent = 'Copied';
-                    setTimeout(function () { btn.textContent = 'Share'; }, 1600);
-                }).catch(function () {
-                    window.prompt('Copy receipt text', text);
-                });
-                return;
-            }
-            window.prompt('Copy receipt text', text);
         });
     }
 
