@@ -5,6 +5,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>@yield('title', 'POS') | {{ $settings->site_name ?? 'Nomas Apparel' }}</title>
+    <script>
+        (function () {
+            try {
+                if (localStorage.getItem('theme') === 'dark') {
+                    document.documentElement.classList.add('dark');
+                }
+            } catch (e) {}
+        })();
+    </script>
     @include('partials.pwa-head', ['pwaContext' => 'admin'])
     @vite(['resources/css/admin.css', 'resources/js/admin.js'])
     <style>
@@ -31,7 +40,32 @@
             color: var(--pos-ink);
             min-height: 100%;
         }
+        html.dark body {
+            background:
+                radial-gradient(1200px 480px at 12% -10%, rgba(165,129,18,.14), transparent 55%),
+                radial-gradient(900px 420px at 88% 0%, rgba(165,129,18,.05), transparent 50%),
+                #0b1220;
+            color: #e5e7eb;
+            color-scheme: dark;
+        }
+        html.dark {
+            color-scheme: dark;
+        }
         a { color: inherit; text-decoration: none; }
+
+        .pos-theme-btn {
+            width: 36px; height: 36px; border-radius: 999px;
+            border: 1px solid rgba(255,255,255,.12);
+            background: rgba(255,255,255,.06);
+            color: #fbbf24;
+            display: grid; place-items: center;
+            cursor: pointer; padding: 0;
+            flex: 0 0 36px;
+        }
+        .pos-theme-btn:hover { background: rgba(255,255,255,.1); }
+        .pos-theme-btn .icon-sun { display: none; }
+        html.dark .pos-theme-btn .icon-moon { display: none; }
+        html.dark .pos-theme-btn .icon-sun { display: block; }
 
         .pos-top {
             position: sticky;
@@ -164,6 +198,15 @@
         }
         .pager-item.is-active span { background: var(--pos-gold); border-color: var(--pos-gold); color: #111; }
         .pager-item.is-disabled span { opacity: 0.4; }
+        html.dark .alert {
+            background: rgba(245, 158, 11, 0.12); border-color: rgba(245, 158, 11, 0.35); color: #fcd34d;
+        }
+        html.dark .alert-danger {
+            background: rgba(239, 68, 68, 0.15); border-color: rgba(239, 68, 68, 0.35); color: #fca5a5;
+        }
+        html.dark .pager-item a, html.dark .pager-item span {
+            background: #1f2937; border-color: #374151; color: #e5e7eb;
+        }
 
         @media (min-width: 981px) {
             .pos-nav { display: flex; }
@@ -266,6 +309,10 @@
                     <div class="amt">—</div>
                 @endif
             </div>
+            <button type="button" class="pos-theme-btn" id="pos-theme-toggle" title="Toggle dark mode" aria-label="Toggle dark mode">
+                <svg class="icon-moon" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>
+                <svg class="icon-sun" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path stroke-linecap="round" d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32l1.41 1.41M2 12h2m16 0h2M4.93 19.07l1.41-1.41m11.32-11.32l1.41-1.41"/></svg>
+            </button>
             <div class="pos-user-meta">
                 <strong>{{ $posUser?->name ?? 'Cashier' }}</strong>
                 <small>{{ $posRole }}</small>
@@ -339,7 +386,17 @@
             }
         }
     });
+    (function () {
+        var btn = document.getElementById('pos-theme-toggle');
+        if (!btn) return;
+        btn.addEventListener('click', function () {
+            var next = !document.documentElement.classList.contains('dark');
+            document.documentElement.classList.toggle('dark', next);
+            try { localStorage.setItem('theme', next ? 'dark' : 'light'); } catch (e) {}
+        });
+    })();
 </script>
 @stack('scripts')
+@include('partials.pwa-install', ['pwaContext' => 'admin'])
 </body>
 </html>

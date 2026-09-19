@@ -125,7 +125,7 @@
     <div class="product-row product-row-two">
         <div class="product-field">
             <label for="product-image-url">Image URL</label>
-            <input id="product-image-url" type="url" name="image_url" class="product-input @error('image_url') is-invalid @enderror" value="{{ old('image_url', $product?->image_url) }}">
+            <input id="product-image-url" type="text" name="image_url" class="product-input @error('image_url') is-invalid @enderror" value="{{ old('image_url', $product?->image_url) }}" placeholder="https://... or /storage/...">
             @error('image_url')
                 <small class="product-error">{{ $message }}</small>
             @enderror

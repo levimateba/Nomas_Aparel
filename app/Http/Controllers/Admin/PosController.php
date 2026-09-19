@@ -13,6 +13,7 @@ use App\Models\Setting;
 use App\Models\ShopCustomer;
 use App\Services\CashierShiftService;
 use App\Services\LoyaltyService;
+use App\Services\Pos\PosSaleCompleter;
 use App\Services\ProductVariantService;
 use App\Support\Audit;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -41,16 +42,24 @@ class PosController extends Controller
         $scanMode = $request->boolean('mode') || $request->input('mode') === 'scan'
             || $request->routeIs('admin.pos.scan');
         $posRoute = $scanMode ? 'admin.pos.scan' : 'admin.pos.index';
-        $redirectParams = $request->only('category_id');
 
-        if ($query !== '') {
+        if ($query !== '' && ! $request->boolean('live')) {
             $resolved = Product::resolveActiveScan($query);
 
-            if ($resolved) {
+            // Only auto-add a concrete sellable line. Parent products with variants
+            // (e.g. typing a size like "XS") must fall through to filtered search.
+            $canAutoAdd = $resolved
+                && ($resolved['variant'] || ! $resolved['product']->usesVariants());
+
+            if ($canAutoAdd) {
                 $error = $this->addProductToCart($resolved['product'], 1, $resolved['variant']);
                 if ($error) {
                     return redirect()
-                        ->route($posRoute, $redirectParams)
+                        ->route($posRoute, array_filter([
+                            'q' => $query,
+                            'category_id' => $request->input('category_id'),
+                            'view' => $request->input('view'),
+                        ]))
                         ->withErrors(['pos' => $error]);
                 }
 
@@ -59,29 +68,66 @@ class PosController extends Controller
                     : $resolved['product']->name;
 
                 return redirect()
-                    ->route($posRoute, $redirectParams)
+                    ->route($posRoute, array_filter([
+                        'category_id' => $request->input('category_id'),
+                        'view' => $request->input('view'),
+                    ]))
                     ->with('success', $label.' added.');
             }
         }
 
         $products = Product::query()
-            ->with(['category', 'activeVariants'])
+            ->with([
+                'category',
+                'activeVariants' => fn ($q) => $q->with('attributeValues'),
+            ])
             ->where('is_active', true)
             ->when($request->filled('category_id'), fn ($builder) => $builder->where('category_id', $request->integer('category_id')))
             ->when($query !== '', function ($builder) use ($query) {
                 $builder->where(function ($search) use ($query) {
-                    $search->where('name', 'like', '%' . $query . '%')
-                        ->orWhere('sku', 'like', '%' . $query . '%');
+                    $like = '%'.$query.'%';
+                    $search->where('name', 'like', $like)
+                        ->orWhere('sku', 'like', $like);
                     if (Schema::hasColumn('products', 'barcode')) {
-                        $search->orWhere('barcode', 'like', '%' . $query . '%');
+                        $search->orWhere('barcode', 'like', $like);
                     }
+                    if (Schema::hasColumn('products', 'search_keywords')) {
+                        $search->orWhere('search_keywords', 'like', $like);
+                    }
+                    if (Schema::hasColumn('products', 'batch_lot')) {
+                        $search->orWhere('batch_lot', 'like', $like);
+                    }
+                    if (Schema::hasColumn('products', 'shelf_location')) {
+                        $search->orWhere('shelf_location', 'like', $like);
+                    }
+                    if (Schema::hasTable('product_barcodes')) {
+                        $search->orWhereHas('additionalBarcodes', fn ($b) => $b->where('barcode', 'like', $like));
+                    }
+                    if (Schema::hasTable('product_brands')) {
+                        $search->orWhereHas('brand', fn ($b) => $b->where('name', 'like', $like));
+                    }
+                    $search->orWhereHas('category', fn ($c) => $c->where('name', 'like', $like));
                     if (Schema::hasTable('product_variants')) {
-                        $search->orWhereHas('variants', function ($v) use ($query) {
+                        $search->orWhereHas('variants', function ($v) use ($like, $query) {
                             $v->where('is_active', true)
-                                ->where(function ($inner) use ($query) {
-                                    $inner->where('sku', 'like', '%'.$query.'%')
-                                        ->orWhere('barcode', 'like', '%'.$query.'%')
-                                        ->orWhere('name', 'like', '%'.$query.'%');
+                                ->where(function ($inner) use ($like, $query) {
+                                    $inner->where('sku', 'like', $like)
+                                        ->orWhere('barcode', 'like', $like)
+                                        ->orWhere('name', 'like', $like);
+                                    if (Schema::hasColumn('product_variants', 'option_signature')) {
+                                        $inner->orWhere('option_signature', 'like', $like);
+                                    }
+                                    if (Schema::hasTable('variant_attribute_values')) {
+                                        $inner->orWhereHas('attributeValues', function ($av) use ($like, $query) {
+                                            $av->where('value', 'like', $like)
+                                                ->orWhere('code', 'like', $like);
+                                            // Prefer exact size/colour tokens (XS, S, M…) when short
+                                            if (mb_strlen($query) <= 8) {
+                                                $av->orWhereRaw('LOWER(value) = ?', [mb_strtolower($query)])
+                                                    ->orWhereRaw('LOWER(code) = ?', [mb_strtolower($query)]);
+                                            }
+                                        });
+                                    }
                                 });
                         });
                     }
@@ -450,6 +496,13 @@ class PosController extends Controller
             'notes' => 'nullable|string|max:500',
         ]);
 
+        // M-PESA uses STK Push + Daraja callback — do not complete via this form.
+        if ($data['payment_method'] === 'mobile_money') {
+            return back()->withErrors([
+                'payment_method' => 'Use Send M-PESA Request and wait for the customer to confirm on their phone.',
+            ])->withInput();
+        }
+
         $loyalty = app(LoyaltyService::class);
         $loyaltySettings = $loyalty->settings();
         $shopCustomer = null;
@@ -466,7 +519,6 @@ class PosController extends Controller
         }
 
         $change = $data['payment_method'] === 'cash' ? round($tendered - $total, 2) : 0;
-        $orderNumber = 'POS-' . now()->format('YmdHis') . '-' . random_int(100, 999);
 
         $notes = trim((string) ($data['notes'] ?? ''));
         if ($data['payment_method'] === 'cash') {
@@ -480,167 +532,17 @@ class PosController extends Controller
             $data['customer_email'] = $shopCustomer->email ?: ($data['customer_email'] ?? null);
         }
 
-        $redeemPoints = (int) ($totals['loyalty_points_redeemed'] ?? 0);
-        $loyaltyDiscount = (float) ($totals['loyalty_discount'] ?? 0);
-
-        $order = DB::transaction(function () use ($data, $cart, $total, $totals, $orderNumber, $notes, $settings, $shopCustomer, $loyalty, $loyaltySettings, $redeemPoints, $loyaltyDiscount) {
-            $payload = [
-                'order_number' => $orderNumber,
-                'user_id' => auth()->id(),
-                'customer_name' => ($data['customer_name'] ?? null) ?: 'Walk-in Customer',
-                'customer_email' => ($data['customer_email'] ?? null) ?: 'walkin@pos.local',
-                'customer_phone' => $data['customer_phone'] ?? null,
-                'shipping_address' => 'In-store sale',
-                'notes' => $notes ?: null,
-                'status' => 'paid',
-                'payment_method' => $data['payment_method'],
-                'payment_status' => 'paid',
-                'total_amount' => $total,
-            ];
-
-            if (Schema::hasColumn('orders', 'cashier_shift_id')) {
-                $payload['cashier_shift_id'] = app(CashierShiftService::class)->currentOpen(auth()->id())?->id;
-            }
-            if (Schema::hasColumn('orders', 'source')) {
-                $payload['source'] = 'pos';
-            }
-            if (Schema::hasColumn('orders', 'discount_amount')) {
-                $payload['discount_amount'] = round(
-                    (float) ($totals['coupon_discount'] ?? 0) + (float) ($totals['sale_discount'] ?? 0),
-                    2
-                );
-            }
-            if (Schema::hasColumn('orders', 'tax_amount')) {
-                $payload['tax_amount'] = $totals['tax'] ?? 0;
-            }
-            if (Schema::hasColumn('orders', 'coupon_code')) {
-                $payload['coupon_code'] = $totals['coupon_code'];
-            }
-            if (Schema::hasColumn('orders', 'shop_customer_id') && $shopCustomer) {
-                $payload['shop_customer_id'] = $shopCustomer->id;
-            }
-            if (Schema::hasColumn('orders', 'loyalty_discount_amount')) {
-                $payload['loyalty_discount_amount'] = $loyaltyDiscount;
-            }
-            if (Schema::hasColumn('orders', 'loyalty_points_redeemed')) {
-                $payload['loyalty_points_redeemed'] = $redeemPoints;
-            }
-
-            $created = Order::create($payload);
-
-            $inventory = app(\App\Services\InventoryStockService::class);
-            $posLocation = $inventory->resolvePosLocation($settings);
-            if ($posLocation && Schema::hasColumn('orders', 'stock_location_id')) {
-                $created->forceFill(['stock_location_id' => $posLocation->id])->save();
-            }
-
-            foreach ($cart as $item) {
-                $product = Product::query()->lockForUpdate()->find($item['product_id']);
-                if (! $product || ! $product->is_active) {
-                    throw ValidationException::withMessages(['pos' => 'One or more products are no longer available.']);
-                }
-
-                $variant = null;
-                if (! empty($item['product_variant_id']) && Schema::hasTable('product_variants')) {
-                    $variant = ProductVariant::query()->lockForUpdate()->find($item['product_variant_id']);
-                    if (! $variant || ! $variant->is_active || (int) $variant->product_id !== (int) $product->id) {
-                        throw ValidationException::withMessages(['pos' => 'One or more variants are no longer available.']);
-                    }
-                } elseif ($product->usesVariants()) {
-                    throw ValidationException::withMessages(['pos' => $product->name.' requires a specific variant. Scan the variant barcode.']);
-                }
-
-                $stockService = app(ProductVariantService::class);
-                $available = $inventory->enabled()
-                    ? $inventory->posAvailableStock($product, $variant, $settings)
-                    : $stockService->availableStock($product, $variant, $posLocation);
-                if (! $settings->allow_negative_stock && $available < $item['qty']) {
-                    $locName = ($settings->pos_sell_from_all_locations ?? false)
-                        ? 'POS locations'
-                        : ($posLocation?->name ?? 'POS location');
-                    $totalStock = $inventory->enabled() ? $inventory->totalQuantity($product, $variant) : $available;
-                    $msg = 'Insufficient stock at '.$locName.' for '.($item['name'] ?? $product->name).'. Available: '.$available.'.';
-                    if ($totalStock > $available) {
-                        $msg .= ' Total across locations: '.$totalStock.'.';
-                    }
-                    throw ValidationException::withMessages(['pos' => $msg]);
-                }
-
-                if ($inventory->enabled()) {
-                    $inventory->fulfilPosSale(
-                        $product,
-                        $variant,
-                        (int) $item['qty'],
-                        $created,
-                        $settings,
-                        (bool) $settings->allow_negative_stock
-                    );
-                } else {
-                    $stockService->deductStock(
-                        $product,
-                        (int) $item['qty'],
-                        $variant,
-                        $posLocation,
-                        'SALE',
-                        'POS sale '.$orderNumber,
-                        $created,
-                        (bool) $settings->allow_negative_stock
-                    );
-                }
-
-                $itemPayload = [
-                    'order_id' => $created->id,
-                    'product_id' => $product->id,
-                    'product_name' => $item['name'],
-                    'unit_price' => $item['price'],
-                    'quantity' => $item['qty'],
-                    'line_total' => $item['price'] * $item['qty'],
-                ];
-                if (Schema::hasColumn('order_items', 'product_variant_id')) {
-                    $itemPayload['product_variant_id'] = $variant?->id;
-                }
-                if (Schema::hasColumn('order_items', 'variant_name')) {
-                    $itemPayload['variant_name'] = $variant?->name;
-                }
-                if (Schema::hasColumn('order_items', 'sku')) {
-                    $itemPayload['sku'] = $item['sku'] ?? $variant?->sku ?? $product->sku;
-                }
-
-                OrderItem::create($itemPayload);
-            }
-
-            if (! empty($totals['coupon_code'])) {
-                Coupon::query()->whereRaw('UPPER(code) = ?', [strtoupper($totals['coupon_code'])])->increment('used_count');
-            }
-
-            // Loyalty: redeem then earn (server-side authoritative)
-            if ($loyaltySettings->enabled && $shopCustomer) {
-                if (! $shopCustomer->loyaltyCard) {
-                    // Auto-issue card when program enabled and customer selected
-                    $loyalty->createLoyaltyCard($shopCustomer);
-                    $shopCustomer->load('loyaltyCard');
-                }
-
-                if ($redeemPoints > 0 && $loyaltySettings->redemption_enabled && $loyaltySettings->allow_redemption_at_pos) {
-                    $loyalty->redeemPoints($shopCustomer, $created, $redeemPoints, $loyaltyDiscount, auth()->id());
-                }
-
-                $eligible = $loyalty->getEligibleAmount(
-                    (float) $totals['subtotal'],
-                    (float) ($totals['coupon_discount'] ?? 0) + (float) ($totals['sale_discount'] ?? 0),
-                    $loyaltyDiscount
-                );
-                $earned = $loyalty->calculateEarnedPoints($eligible);
-                if ($earned > 0) {
-                    $loyalty->earnPoints($shopCustomer, $created, $earned, auth()->id());
-                    if (Schema::hasColumn('orders', 'loyalty_points_earned')) {
-                        $created->forceFill(['loyalty_points_earned' => $earned])->save();
-                    }
-                }
-            }
-
-            return $created->fresh();
-        });
+        $order = app(PosSaleCompleter::class)->complete([
+            'cart' => $cart,
+            'totals' => $totals,
+            'payment_method' => $data['payment_method'],
+            'customer_name' => $data['customer_name'] ?? null,
+            'customer_phone' => $data['customer_phone'] ?? null,
+            'customer_email' => $data['customer_email'] ?? null,
+            'notes' => $notes ?: null,
+            'user_id' => (int) auth()->id(),
+            'shop_customer_id' => $shopCustomer?->id,
+        ]);
 
         session()->forget([
             'pos_cart',
@@ -895,7 +797,7 @@ class PosController extends Controller
         return null;
     }
 
-    private function totals(array $cart, bool $ignoreLoyaltyRedeem = false): array
+    public function totals(array $cart, bool $ignoreLoyaltyRedeem = false): array
     {
         $settings = Setting::get_settings();
         $subtotal = (float) collect($cart)->sum(fn ($item) => ((float) $item['price']) * ((int) $item['qty']));

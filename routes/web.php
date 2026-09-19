@@ -23,10 +23,12 @@ use App\Http\Controllers\Admin\EmployeeController;
 use App\Http\Controllers\Admin\AuditLogController;
 use App\Http\Controllers\Admin\HeldSaleController;
 use App\Http\Controllers\Admin\BrandController;
+use App\Http\Controllers\Admin\ProductStyleController;
 use App\Http\Controllers\Admin\SupplierController;
 use App\Http\Controllers\Admin\PurchaseController;
 use App\Http\Controllers\Admin\PurchaseOrderController;
 use App\Http\Controllers\Admin\TrainingController;
+use App\Http\Controllers\MpesaController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Admin\RoleController;
 use App\Http\Controllers\Admin\PermissionController;
@@ -107,6 +109,16 @@ Route::middleware(['web'])->group(function () {
     Route::post('/shop/{product}/questions', [ProductQuestionController::class, 'store'])->middleware('auth')->name('shop.questions.store');
     Route::post('/payments/callback', [PaymentController::class, 'callback'])->name('payments.callback');
     Route::get('/payments/return', [PaymentController::class, 'return'])->name('payments.return');
+
+    // Safaricom Daraja M-PESA (callback must be public HTTPS; no admin auth)
+    Route::post('/api/mpesa/callback', [MpesaController::class, 'callback'])->name('mpesa.callback');
+
+    // STK / status require POS admin session (same permission as create_sale via admin.mpesa.*)
+    Route::middleware(App\Http\Middleware\AdminMiddleware::class)->group(function () {
+        Route::post('/api/mpesa/stk-push', [MpesaController::class, 'stkPush'])->name('admin.mpesa.stk-push');
+        Route::get('/api/mpesa/status/{checkoutRequestId}', [MpesaController::class, 'status'])->name('admin.mpesa.status');
+        Route::get('/api/mpesa/test-oauth', [MpesaController::class, 'testOAuth'])->name('admin.mpesa.test-oauth');
+    });
     Route::get('/blog', [BlogController::class, 'index'])->name('blog.index');
     Route::get('/blog/{slug}', [BlogController::class, 'show'])->name('blog.show');
     Route::post('/blog/{slug}/comments', [BlogController::class, 'comment'])->name('blog.comment');
@@ -181,6 +193,9 @@ Route::middleware(['web'])->group(function () {
         Route::get('/brands', [BrandController::class, 'index'])->name('brands.index');
         Route::post('/brands', [BrandController::class, 'store'])->name('brands.store');
         Route::delete('/brands/{brand}', [BrandController::class, 'destroy'])->name('brands.destroy');
+        Route::get('/product-styles', [ProductStyleController::class, 'index'])->name('product-styles.index');
+        Route::post('/product-styles', [ProductStyleController::class, 'store'])->name('product-styles.store');
+        Route::delete('/product-styles/{productStyle}', [ProductStyleController::class, 'destroy'])->name('product-styles.destroy');
         Route::get('/suppliers', [SupplierController::class, 'index'])->name('suppliers.index');
         Route::get('/suppliers/create', [SupplierController::class, 'create'])->name('suppliers.create');
         Route::post('/suppliers', [SupplierController::class, 'store'])->name('suppliers.store');

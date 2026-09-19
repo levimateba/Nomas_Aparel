@@ -27,16 +27,91 @@
                 </span>
             </a>
 
-            <form action="{{ route('admin.products.index') }}" method="GET" class="hidden flex-1 xl:block xl:max-w-md">
+            @php
+                $globalSearchPages = collect([
+                    ['label' => 'Dashboard', 'group' => 'Home', 'url' => route('admin.dashboard'), 'keywords' => 'home overview', 'show' => true],
+                    ['label' => 'Point of Sale', 'group' => 'Sales', 'url' => route('admin.pos.index'), 'keywords' => 'pos sell checkout', 'show' => $can('create_sale')],
+                    ['label' => 'Scan & Sell', 'group' => 'Sales', 'url' => route('admin.pos.scan'), 'keywords' => 'barcode qr scan', 'show' => $can('create_sale')],
+                    ['label' => 'Cashier Home', 'group' => 'Sales', 'url' => route('admin.cashier.home'), 'keywords' => 'cashier desk', 'show' => $can('create_sale')],
+                    ['label' => 'Products', 'group' => 'Stock & Catalog', 'url' => route('admin.products.index'), 'keywords' => 'catalog inventory sku', 'show' => $can('manage_products')],
+                    ['label' => 'Add Product', 'group' => 'Stock & Catalog', 'url' => route('admin.products.create'), 'keywords' => 'new create product', 'show' => $can('manage_products')],
+                    ['label' => 'Stock Overview', 'group' => 'Stock & Catalog', 'url' => route('admin.stock-overview.index'), 'keywords' => 'inventory levels', 'show' => $can('view_inventory')],
+                    ['label' => 'Stock Valuation', 'group' => 'Stock & Catalog', 'url' => route('admin.reports.stock-valuation'), 'keywords' => 'value inventory', 'show' => $can('view_inventory')],
+                    ['label' => 'Stock Transfers', 'group' => 'Stock & Catalog', 'url' => route('admin.stock-transfers.index'), 'keywords' => 'move transfer', 'show' => $can('create_stock_transfers')],
+                    ['label' => 'Stock Adjustments', 'group' => 'Stock & Catalog', 'url' => route('admin.stock-adjustments.create'), 'keywords' => 'adjust quantity', 'show' => $can('adjust_stock')],
+                    ['label' => 'Stock Movements', 'group' => 'Stock & Catalog', 'url' => route('admin.stock-movements.index'), 'keywords' => 'history movements', 'show' => $can('view_stock_movements')],
+                    ['label' => 'Locations', 'group' => 'Stock & Catalog', 'url' => route('admin.stock-locations.index'), 'keywords' => 'stores warehouses', 'show' => $can('manage_stock_locations')],
+                    ['label' => 'Categories', 'group' => 'Stock & Catalog', 'url' => route('admin.categories.index'), 'keywords' => 'pos categories', 'show' => $can('manage_pos_categories')],
+                    ['label' => 'Brands', 'group' => 'Stock & Catalog', 'url' => route('admin.brands.index'), 'keywords' => 'labels makers', 'show' => $can('manage_products')],
+                    ['label' => 'Product Types', 'group' => 'Stock & Catalog', 'url' => route('admin.product-styles.index'), 'keywords' => 'styles types', 'show' => $can('manage_products')],
+                    ['label' => 'Purchases', 'group' => 'Stock & Catalog', 'url' => route('admin.purchases.index'), 'keywords' => 'buying goods', 'show' => $can('manage_purchases')],
+                    ['label' => 'Stocktake', 'group' => 'Stock & Catalog', 'url' => route('admin.stock-takes.index'), 'keywords' => 'count audit', 'show' => $can('manage_stocktakes')],
+                    ['label' => 'Purchase Orders', 'group' => 'Stock & Catalog', 'url' => route('admin.purchase-orders.index'), 'keywords' => 'po orders', 'show' => $can('manage_purchase_orders') || $can('manage_purchases')],
+                    ['label' => 'Hold Sales', 'group' => 'Sales Desk', 'url' => route('admin.holds.index'), 'keywords' => 'parked holds', 'show' => $can('create_sale')],
+                    ['label' => 'Sales History', 'group' => 'Sales Desk', 'url' => route('admin.orders.index'), 'keywords' => 'orders receipts', 'show' => $can('view_sales')],
+                    ['label' => 'Returns', 'group' => 'Sales Desk', 'url' => route('admin.returns.index'), 'keywords' => 'refunds', 'show' => $can('process_return')],
+                    ['label' => 'Coupons', 'group' => 'Sales Desk', 'url' => route('admin.coupons.index'), 'keywords' => 'discounts promo', 'show' => $can('manage_coupons')],
+                    ['label' => 'Cashier Shifts', 'group' => 'Sales Desk', 'url' => route('admin.shifts.index'), 'keywords' => 'shift open close', 'show' => $can('manage_shifts')],
+                    ['label' => 'Cashier Training', 'group' => 'Sales Desk', 'url' => route('admin.training'), 'keywords' => 'learn guide', 'show' => $can('create_sale')],
+                    ['label' => 'Employees', 'group' => 'People', 'url' => route('admin.employees.index'), 'keywords' => 'staff hr', 'show' => $can('manage_employees')],
+                    ['label' => 'Customers', 'group' => 'People', 'url' => route('admin.customers.index'), 'keywords' => 'clients shoppers', 'show' => $can('manage_customers')],
+                    ['label' => 'Loyalty Members', 'group' => 'People', 'url' => route('admin.loyalty.history'), 'keywords' => 'points cards', 'show' => $can('manage_loyalty')],
+                    ['label' => 'Suppliers', 'group' => 'People', 'url' => route('admin.suppliers.index'), 'keywords' => 'vendors supply', 'show' => $can('manage_suppliers')],
+                    ['label' => 'Vendors', 'group' => 'People', 'url' => route('admin.vendors.index'), 'keywords' => 'partners', 'show' => $can('manage_vendors')],
+                    ['label' => 'Payouts', 'group' => 'People', 'url' => route('admin.vendor-payouts.index'), 'keywords' => 'vendor pay', 'show' => $can('manage_vendors')],
+                    ['label' => 'Expenses', 'group' => 'Finance', 'url' => route('admin.expenses.index'), 'keywords' => 'costs spending', 'show' => $can('manage_expenses')],
+                    ['label' => 'Sales & Inventory Reports', 'group' => 'Reports', 'url' => route('admin.reports.index'), 'keywords' => 'analytics dashboard reports', 'show' => $can('view_pos_reports')],
+                    ['label' => 'Online by Location', 'group' => 'Reports', 'url' => route('admin.reports.online-sales-by-location'), 'keywords' => 'ecommerce location', 'show' => $can('view_pos_reports')],
+                    ['label' => 'Cashier Performance', 'group' => 'Reports', 'url' => route('admin.reports.cashier'), 'keywords' => 'staff sales report', 'show' => $can('view_cashier_performance')],
+                    ['label' => 'Users', 'group' => 'Administration', 'url' => route('admin.users.index'), 'keywords' => 'accounts logins', 'show' => $can('view_users')],
+                    ['label' => 'Roles', 'group' => 'Administration', 'url' => route('admin.roles.index'), 'keywords' => 'permissions roles', 'show' => $can('view_roles')],
+                    ['label' => 'Permissions', 'group' => 'Administration', 'url' => route('admin.permissions.index'), 'keywords' => 'access rights', 'show' => $can('view_permissions')],
+                    ['label' => 'Audit Logs', 'group' => 'Administration', 'url' => route('admin.audit-logs.index'), 'keywords' => 'activity history', 'show' => $can('view_audit_logs')],
+                    ['label' => 'Settings', 'group' => 'Administration', 'url' => route('admin.settings.edit'), 'keywords' => 'config store', 'show' => $can('manage_system_settings')],
+                    ['label' => 'Profile', 'group' => 'Administration', 'url' => route('admin.profile.edit'), 'keywords' => 'account password', 'show' => true],
+                ]);
+
+                $globalSearchPages = $globalSearchPages
+                    ->filter(function ($item) {
+                        return ! empty($item['show']);
+                    })
+                    ->map(function ($item) {
+                        return [
+                            'label' => $item['label'],
+                            'group' => $item['group'],
+                            'url' => $item['url'],
+                            'keywords' => $item['keywords'],
+                        ];
+                    })
+                    ->values();
+
+                $globalSearchPagesJson = $globalSearchPages->toJson(JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+                $globalSearchProductsUrlJson = json_encode(route('admin.products.index'), JSON_UNESCAPED_SLASHES);
+            @endphp
+
+            <div id="admin-global-search-wrap" class="relative hidden min-w-0 flex-1 lg:block lg:max-w-md">
                 <div class="relative">
-                    <span class="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">
+                    <span class="pointer-events-none absolute left-4 top-1/2 z-10 -translate-y-1/2 text-gray-400">
                         <svg class="fill-current" width="20" height="20" viewBox="0 0 20 20"><path fill-rule="evenodd" clip-rule="evenodd" d="M3.04175 9.37363C3.04175 5.87693 5.87711 3.04199 9.37508 3.04199C12.8731 3.04199 15.7084 5.87693 15.7084 9.37363C15.7084 12.8703 12.8731 15.7053 9.37508 15.7053C5.87711 15.7053 3.04175 12.8703 3.04175 9.37363ZM9.37508 1.54199C5.04902 1.54199 1.54175 5.04817 1.54175 9.37363C1.54175 13.6991 5.04902 17.2053 9.37508 17.2053C11.2674 17.2053 13.003 16.5344 14.357 15.4176L17.177 18.238C17.4699 18.5309 17.9448 18.5309 18.2377 18.238C18.5306 17.9451 18.5306 17.4703 18.2377 17.1774L15.418 14.3573C16.5365 13.0033 17.2084 11.2669 17.2084 9.37363C17.2084 5.04817 13.7011 1.54199 9.37508 1.54199Z"/></svg>
                     </span>
-                    <input type="text" name="q" placeholder="Search products, SKU, barcode..."
-                        class="h-11 w-full rounded-lg border border-gray-200 bg-transparent py-2.5 pl-12 pr-14 text-sm text-gray-800 shadow-theme-xs placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10">
-                    <span class="absolute right-3 top-1/2 -translate-y-1/2 rounded-md border border-gray-200 bg-gray-50 px-2 py-0.5 text-[11px] font-semibold text-gray-400">⌘K</span>
+                    <input
+                        id="admin-global-search"
+                        type="text"
+                        role="combobox"
+                        aria-expanded="false"
+                        aria-controls="admin-global-search-results"
+                        aria-autocomplete="list"
+                        placeholder="Search pages, products, SKU…"
+                        autocomplete="off"
+                        spellcheck="false"
+                        class="admin-global-search-input h-11 w-full rounded-lg border border-gray-200 bg-white py-2.5 pl-12 pr-14 text-sm text-gray-900 shadow-theme-xs placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-600 dark:bg-gray-800 dark:text-white dark:placeholder:text-gray-400 dark:focus:border-brand-500"
+                    >
+                    <button type="button" id="admin-global-search-kbd" class="absolute right-3 top-1/2 -translate-y-1/2 rounded-md border border-gray-200 bg-gray-50 px-2 py-0.5 text-[11px] font-semibold text-gray-400 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-400" title="Focus search (⌘K)" aria-label="Focus search">⌘K</button>
                 </div>
-            </form>
+                <div id="admin-global-search-results" class="admin-global-search-results absolute left-0 right-0 top-[calc(100%+6px)] z-[100000] hidden max-h-[min(70vh,420px)] overflow-y-auto rounded-xl border border-gray-200 bg-white py-2 shadow-xl dark:border-gray-700 dark:bg-gray-900" role="listbox"></div>
+            </div>
+            <script type="application/json" id="admin-global-search-pages">{!! $globalSearchPagesJson !!}</script>
+            <script type="application/json" id="admin-global-search-products-url">{!! $globalSearchProductsUrlJson !!}</script>
         </div>
 
         <div class="flex shrink-0 items-center justify-end gap-1.5 sm:gap-2">

@@ -132,32 +132,32 @@
     </div>
 
     {{-- Filters --}}
-    <form method="GET" action="{{ route('admin.products.index') }}" class="ta-toolbar">
-        <div class="ta-field" style="flex:2;min-width:220px;">
-            <label>Search</label>
-            <input type="text" name="q" class="ta-input" value="{{ request('q') }}" placeholder="Search by name, brand, SKU, or barcode…">
+    <form method="GET" action="{{ route('admin.products.index') }}" class="ta-toolbar ta-toolbar--filters" id="product-filter-form">
+        <div class="ta-field">
+            <label for="product-search-q">Search</label>
+            <input type="text" name="q" id="product-search-q" class="ta-input" value="{{ request('q') }}" placeholder="Search by name, brand, SKU, or barcode…" autocomplete="off">
         </div>
-        <div class="ta-field" style="max-width:180px;">
-            <label>Category</label>
-            <select name="category_id" class="ta-select">
+        <div class="ta-field">
+            <label for="product-filter-category">Category</label>
+            <select id="product-filter-category" name="category_id" class="ta-select">
                 <option value="">All categories</option>
                 @foreach($categories as $cat)
                     <option value="{{ $cat->id }}" @selected((string) request('category_id') === (string) $cat->id)>{{ $cat->name }}</option>
                 @endforeach
             </select>
         </div>
-        <div class="ta-field" style="max-width:160px;">
-            <label>Brand</label>
-            <select name="brand_id" class="ta-select">
+        <div class="ta-field">
+            <label for="product-filter-brand">Brand</label>
+            <select id="product-filter-brand" name="brand_id" class="ta-select">
                 <option value="">All brands</option>
                 @foreach($brands as $brand)
                     <option value="{{ $brand->id }}" @selected((string) request('brand_id') === (string) $brand->id)>{{ $brand->name }}</option>
                 @endforeach
             </select>
         </div>
-        <div class="ta-field" style="max-width:160px;">
-            <label>Stock Status</label>
-            <select name="stock" class="ta-select">
+        <div class="ta-field">
+            <label for="product-filter-stock">Stock Status</label>
+            <select id="product-filter-stock" name="stock" class="ta-select">
                 <option value="">All</option>
                 <option value="in" @selected(request('stock') === 'in')>In stock</option>
                 <option value="low" @selected(request('stock') === 'low')>Low stock</option>
@@ -165,13 +165,15 @@
             </select>
         </div>
         <input type="hidden" name="per_page" value="{{ $perPage }}">
-        <button type="submit" class="ta-btn">
-            <svg class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/></svg>
-            Filter
-        </button>
-        @if(request()->anyFilled(['q', 'category_id', 'brand_id', 'stock', 'status']))
-            <a href="{{ route('admin.products.index') }}" class="ta-btn-outline">Reset</a>
-        @endif
+        <div class="ta-toolbar-actions">
+            <button type="submit" class="ta-btn">
+                <svg class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/></svg>
+                Filter
+            </button>
+            @if(request()->anyFilled(['q', 'category_id', 'brand_id', 'stock', 'status']))
+                <a href="{{ route('admin.products.index') }}" class="ta-btn-outline">Reset</a>
+            @endif
+        </div>
     </form>
 
     {{-- Table --}}
@@ -246,8 +248,8 @@
                             </td>
                             <td class="text-gray-400">{{ $products->firstItem() + $index }}</td>
                             <td>
-                                <div class="flex items-center gap-3">
-                                    <div class="h-11 w-11 flex-shrink-0 overflow-hidden rounded-lg border border-gray-100 bg-gray-50 dark:border-gray-800">
+                                <div class="flex items-center gap-3 min-w-[220px]">
+                                    <div class="h-11 w-11 flex-shrink-0 overflow-hidden rounded-lg border border-gray-100 bg-gray-50 dark:border-gray-700 dark:bg-gray-800">
                                         @if($thumb)
                                             <img src="{{ $thumb }}" alt="" class="h-full w-full object-cover">
                                         @else
@@ -256,7 +258,7 @@
                                             </div>
                                         @endif
                                     </div>
-                                    <div class="min-w-0">
+                                    <div class="min-w-0 max-w-[260px]">
                                         <div class="ta-name truncate">{{ $product->name }}</div>
                                         <div class="ta-muted truncate">{{ $desc }}</div>
                                         @if($product->has_variants)
@@ -265,12 +267,12 @@
                                     </div>
                                 </div>
                             </td>
-                            <td>
-                                <div class="font-medium text-gray-800 dark:text-white/90">{{ $product->sku ?: '—' }}</div>
+                            <td class="whitespace-nowrap">
+                                <div class="font-medium text-gray-800 dark:text-white">{{ $product->sku ?: '—' }}</div>
                                 <div class="ta-muted">{{ $product->barcode ?: 'No barcode' }}</div>
                             </td>
-                            <td>{{ $product->brand?->name ?: '—' }}</td>
-                            <td>{{ $product->category?->name ?: '—' }}</td>
+                            <td class="whitespace-nowrap text-gray-700 dark:text-gray-200">{{ $product->brand?->name ?: '—' }}</td>
+                            <td class="whitespace-nowrap text-gray-700 dark:text-gray-200">{{ $product->category?->name ?: '—' }}</td>
                             <td>
                                 <div class="flex flex-col gap-1 text-xs text-gray-600 dark:text-gray-300">
                                     <div class="inline-flex items-center gap-1.5">
@@ -352,5 +354,48 @@ document.getElementById('select-all-products')?.addEventListener('change', funct
     const checked = this.checked;
     document.querySelectorAll('.product-check').forEach(el => el.checked = checked);
 });
+
+(function () {
+    const form = document.getElementById('product-filter-form');
+    const input = document.getElementById('product-search-q');
+    if (!form || !input) return;
+
+    const FOCUS_KEY = 'nomas-products-search-focus';
+
+    // After live-search reload, put the cursor back in Search so typing can continue.
+    try {
+        const raw = sessionStorage.getItem(FOCUS_KEY);
+        if (raw) {
+            sessionStorage.removeItem(FOCUS_KEY);
+            const saved = JSON.parse(raw);
+            if (saved && saved.focus) {
+                requestAnimationFrame(function () {
+                    input.focus();
+                    const pos = Number.isFinite(saved.pos) ? saved.pos : input.value.length;
+                    try {
+                        input.setSelectionRange(pos, pos);
+                    } catch (e) {}
+                });
+            }
+        }
+    } catch (e) {}
+
+    let timer = null;
+    input.addEventListener('input', function () {
+        clearTimeout(timer);
+        timer = setTimeout(function () {
+            try {
+                sessionStorage.setItem(FOCUS_KEY, JSON.stringify({
+                    focus: true,
+                    pos: input.selectionStart ?? input.value.length,
+                }));
+            } catch (e) {}
+            form.requestSubmit();
+        }, 450);
+    });
+    form.querySelectorAll('select').forEach(function (sel) {
+        sel.addEventListener('change', function () { form.requestSubmit(); });
+    });
+})();
 </script>
 @endsection

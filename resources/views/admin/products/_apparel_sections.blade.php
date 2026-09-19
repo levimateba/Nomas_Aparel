@@ -79,51 +79,84 @@
                         <option value="{{ $style->id }}" @selected((string)old('product_style_id', $p->product_style_id ?? '') === (string)$style->id)>{{ $style->name }}</option>
                     @endforeach
                 </select>
+                <div class="pf-quick-add" data-quick-add="style" style="display:flex;gap:8px;margin-top:8px;align-items:center;">
+                    <input type="text" id="quick-style-name" class="pf-input" placeholder="New type (e.g. Hoodie)" style="flex:1;">
+                    <button type="button" class="pf-btn-cancel" style="padding:10px 12px;white-space:nowrap;" id="quick-style-save">Save type</button>
+                </div>
+                <span class="pf-help" id="quick-style-msg" style="display:none;"></span>
             </div>
         </div>
     </div>
 </div>
 
+@include('admin.products._pricing_section')
+
 <div class="pf-card" id="variants-card">
     <div class="pf-card-head">
-        <div class="pf-card-num">3</div>
+        <div class="pf-card-num">4</div>
         <div>
             <h3 class="pf-card-title">Variants</h3>
-            <p class="pf-card-sub">Size, colour, and per-variant stock. Leave off for a single SKU.</p>
+            <p class="pf-card-sub">Sizes/colours. Uses the Pricing values above as the starting price for every row.</p>
         </div>
     </div>
     <div class="pf-card-body" style="display:grid;gap:16px;">
-        <div class="pf-field" style="max-width:280px;">
-            <label class="pf-label" for="has_variants">Has Variants?</label>
-            <select id="has_variants" name="has_variants" class="pf-input" onchange="toggleVariantBuilder()">
-                <option value="0" @selected(! old('has_variants', $p->has_variants ?? false))>No — single product</option>
-                <option value="1" @selected(old('has_variants', $p->has_variants ?? false))>Yes — size / colour / etc.</option>
-            </select>
-            <span class="pf-help">Each variant has its own SKU, barcode, price, and stock.</span>
+        <div class="pf-field">
+            <label class="pf-label">Does this product have variants?</label>
+            <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;max-width:560px;">
+                <label class="variant-mode-card" style="display:flex;gap:10px;align-items:flex-start;border:1.5px solid #e5e7eb;border-radius:12px;padding:12px;cursor:pointer;background:#fff;">
+                    <input type="radio" name="has_variants" value="0" style="margin-top:3px;"
+                           @checked(! old('has_variants', $p->has_variants ?? false))
+                           onchange="toggleVariantBuilder()">
+                    <span>
+                        <strong style="display:block;font-size:13px;">No — single SKU</strong>
+                        <span class="pf-help" style="display:block;margin-top:2px;">One product — use Pricing above and Opening stock below.</span>
+                    </span>
+                </label>
+                <label class="variant-mode-card" style="display:flex;gap:10px;align-items:flex-start;border:1.5px solid #e5e7eb;border-radius:12px;padding:12px;cursor:pointer;background:#fff;">
+                    <input type="radio" name="has_variants" value="1" style="margin-top:3px;"
+                           @checked(old('has_variants', $p->has_variants ?? false))
+                           onchange="toggleVariantBuilder()">
+                    <span>
+                        <strong style="display:block;font-size:13px;">Yes — size / colour</strong>
+                        <span class="pf-help" style="display:block;margin-top:2px;">Tick sizes &amp; colours, Generate, then edit prices per row if needed.</span>
+                    </span>
+                </label>
+            </div>
         </div>
 
-        <div id="variant-builder" style="display:none;display:grid;gap:14px;">
-            <p class="pf-help" style="margin:0;">Select attribute values, then generate combinations. Edit the table before saving.</p>
-            <div id="variant-attr-pickers" style="display:grid;gap:12px;">
-                @foreach(($variantAttributes ?? []) as $attr)
-                    <div class="pf-field" data-attr-id="{{ $attr->id }}" data-attr-name="{{ $attr->name }}">
-                        <label class="pf-label">{{ $attr->name }}</label>
-                        <div style="display:flex;flex-wrap:wrap;gap:8px;">
-                            @foreach($attr->values as $val)
-                                <label style="display:inline-flex;align-items:center;gap:6px;border:1px solid #e5e7eb;border-radius:8px;padding:6px 10px;font-size:12px;background:#fff;">
-                                    <input type="checkbox" class="attr-value-check" value="{{ $val->id }}" data-label="{{ $val->value }}" data-code="{{ $val->code }}">
-                                    @if($val->hex_color)<span style="width:12px;height:12px;border-radius:50%;background:{{ $val->hex_color }};border:1px solid #d1d5db;display:inline-block;"></span>@endif
-                                    {{ $val->value }}
-                                </label>
-                            @endforeach
+        <div id="variant-builder" hidden style="display:none;gap:14px;">
+            @if(($variantAttributes ?? collect())->isEmpty())
+                <div style="padding:12px 14px;border-radius:12px;border:1px solid #fcd34d;background:#fffbeb;font-size:13px;color:#92400e;">
+                    No size/colour options are set up yet. Ask an admin to run the apparel catalog seeder, or add variant attributes in the database.
+                </div>
+            @else
+                <div id="variant-price-from-pricing" style="padding:12px 14px;border-radius:12px;border:1px solid #e5e7eb;background:#f9fafb;font-size:13px;">
+                    <strong style="display:block;margin-bottom:4px;">Starting prices (from Pricing above)</strong>
+                    <span id="variant-price-summary">Buying — · Selling — · Wholesale —</span>
+                    <p class="pf-help" style="margin:6px 0 0;">Generate copies these into every variant. Change a row only when that size/colour has a different price. Tax &amp; discount stay in Pricing.</p>
+                </div>
+                <p class="pf-help" style="margin:0;"><strong>Step 1:</strong> Tick sizes and colours.<br><strong>Step 2:</strong> Click <em>Generate variants</em> (uses Pricing above).<br><strong>Step 3:</strong> Edit Buying/Selling/Wholesale on any row that differs, then set stock.</p>
+                <div id="variant-attr-pickers" style="display:grid;gap:12px;">
+                    @foreach(($variantAttributes ?? []) as $attr)
+                        <div class="pf-field" data-attr-id="{{ $attr->id }}" data-attr-name="{{ $attr->name }}">
+                            <label class="pf-label">{{ $attr->name }} <span class="pf-help">(select one or more)</span></label>
+                            <div style="display:flex;flex-wrap:wrap;gap:8px;">
+                                @foreach($attr->values as $val)
+                                    <label style="display:inline-flex;align-items:center;gap:6px;border:1px solid #e5e7eb;border-radius:8px;padding:6px 10px;font-size:12px;background:#fff;cursor:pointer;">
+                                        <input type="checkbox" class="attr-value-check" value="{{ $val->id }}" data-label="{{ $val->value }}" data-code="{{ $val->code }}">
+                                        @if($val->hex_color)<span style="width:12px;height:12px;border-radius:50%;background:{{ $val->hex_color }};border:1px solid #d1d5db;display:inline-block;"></span>@endif
+                                        {{ $val->value }}
+                                    </label>
+                                @endforeach
+                            </div>
                         </div>
-                    </div>
-                @endforeach
-            </div>
-            <div style="display:flex;gap:8px;flex-wrap:wrap;">
-                <button type="button" class="pf-btn-cancel" style="padding:8px 12px;" onclick="generateVariants()">Generate variants</button>
-                <button type="button" class="pf-btn-cancel" style="padding:8px 12px;" onclick="applyPriceToAllVariants()">Apply base price to all</button>
-            </div>
+                    @endforeach
+                </div>
+                <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+                    <button type="button" class="ta-btn" style="padding:8px 14px;" onclick="generateVariants()">Generate variants</button>
+                    <button type="button" class="pf-btn-cancel" style="padding:8px 12px;" onclick="applyPriceToAllVariants()">Apply Pricing to all variants</button>
+                </div>
+            @endif
             <div style="overflow-x:auto;">
                 <table class="admin-table" id="variants-table" style="width:100%;border-collapse:collapse;font-size:13px;">
                     <thead>
@@ -173,34 +206,6 @@
             <label class="pf-label" for="care_instructions">Care Instructions</label>
             <textarea id="care_instructions" name="care_instructions" class="pf-input" style="min-height:90px;" placeholder="Machine wash cold. Do not bleach. Iron low.">{{ old('care_instructions', $p->care_instructions ?? '') }}</textarea>
         </div>
-    </div>
-</details>
-
-<details class="pf-card pf-details" id="section-gallery" @if(! $collapseAdvanced) open @endif>
-    <summary class="pf-card-head pf-summary">
-        <div class="pf-card-num is-muted">+</div>
-        <div>
-            <h3 class="pf-card-title">Image Gallery <span class="pf-optional">optional</span></h3>
-            <p class="pf-card-sub">Extra photos beyond the main product image.</p>
-        </div>
-        <svg class="pf-chevron" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
-    </summary>
-    <div class="pf-card-body" style="display:grid;gap:12px;">
-        <div class="pf-field">
-            <label class="pf-label">Additional images</label>
-            <input type="file" name="gallery_files[]" class="pf-input" accept="image/png,image/jpeg,image/webp" multiple>
-            <span class="pf-help">JPG, PNG or WebP up to 2MB each. Main image is set in Product Details.</span>
-        </div>
-        @if($p && $p->images && $p->images->count())
-            <div style="display:flex;flex-wrap:wrap;gap:8px;">
-                @foreach($p->images as $img)
-                    <div style="width:72px;height:72px;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;background:#f9fafb;">
-                        <img src="{{ $img->image_url }}" alt="" style="width:100%;height:100%;object-fit:cover;">
-                        <input type="hidden" name="gallery_urls[]" value="{{ $img->image_url }}">
-                    </div>
-                @endforeach
-            </div>
-        @endif
     </div>
 </details>
 
@@ -266,11 +271,38 @@ window.__variantAttrs = @json($variantAttrsForJs);
 window.__stockLocations = @json($locationsForJs);
 
 function toggleVariantBuilder() {
-    const on = document.getElementById('has_variants')?.value === '1';
+    const selected = document.querySelector('input[name="has_variants"]:checked');
+    const on = (selected?.value === '1') || document.getElementById('has_variants')?.value === '1';
     const box = document.getElementById('variant-builder');
-    if (box) box.style.display = on ? 'grid' : 'none';
+    if (box) {
+        box.hidden = !on;
+        box.style.display = on ? 'grid' : 'none';
+    }
     const simple = document.getElementById('location-stock-simple');
     if (simple) simple.style.display = on ? 'none' : 'grid';
+    const stockCard = document.getElementById('stock-adjust');
+    if (stockCard) {
+        stockCard.style.opacity = on ? '0.72' : '1';
+        const sub = stockCard.querySelector('.pf-card-sub');
+        if (sub) {
+            sub.textContent = on
+                ? 'Disabled while variants are on — set stock in the Variants table above.'
+                : 'Set quantities per location. POS sells from Shop — put stock there to sell immediately.';
+        }
+        stockCard.querySelectorAll('input, select, textarea, button').forEach(el => {
+            el.disabled = !!on;
+        });
+    }
+    const notice = document.getElementById('stock-variants-notice');
+    if (notice) {
+        notice.hidden = !on;
+        notice.style.display = on ? 'block' : 'none';
+    }
+    document.querySelectorAll('.variant-mode-card').forEach(card => {
+        const checked = card.querySelector('input')?.checked;
+        card.style.borderColor = checked ? '#a58112' : '#e5e7eb';
+        card.style.background = checked ? '#fffbeb' : '#fff';
+    });
 }
 function cartesian(groups) {
     return groups.reduce((acc, curr) => {
@@ -289,6 +321,23 @@ function emptyLocationStock() {
     (window.__stockLocations || []).forEach(l => { map[l.id] = 0; });
     return map;
 }
+function baseBuyingPrice() {
+    return document.getElementById('pf-cost')?.value || document.getElementById('product-buying-price')?.value || 0;
+}
+function baseSellingPrice() {
+    return document.getElementById('product-price')?.value || 0;
+}
+function baseWholesalePrice() {
+    return document.getElementById('product-wholesale')?.value || '';
+}
+function updateVariantPriceSummary() {
+    const el = document.getElementById('variant-price-summary');
+    if (!el) return;
+    const buy = baseBuyingPrice() || '0';
+    const sell = baseSellingPrice() || '0';
+    const whole = baseWholesalePrice() || '—';
+    el.textContent = `Buying ${buy} · Selling ${sell} · Wholesale ${whole}`;
+}
 function generateVariants() {
     const groups = [];
     document.querySelectorAll('#variant-attr-pickers .pf-field').forEach(field => {
@@ -302,11 +351,16 @@ function generateVariants() {
         alert('Select at least one attribute value (e.g. Size and Colour).');
         return;
     }
+    const buy = baseBuyingPrice();
+    const price = baseSellingPrice();
+    const wholesale = baseWholesalePrice();
+    if (!price || Number(price) <= 0) {
+        alert('Fill Selling Price in the Pricing section above first. Generate copies those prices into every variant.');
+        document.getElementById('section-pricing')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        return;
+    }
     const combos = cartesian(groups);
     const baseSku = (document.getElementById('product-sku')?.value || 'SKU').replace(/[^A-Za-z0-9]+/g, '').toUpperCase() || 'SKU';
-    const buy = document.getElementById('pf-cost')?.value || document.getElementById('product-buying-price')?.value || 0;
-    const price = document.getElementById('product-price')?.value || 0;
-    const wholesale = document.getElementById('product-wholesale')?.value || '';
     const rows = combos.map(combo => ({
         id: '',
         name: combo.map(c => c.label).join(' / '),
@@ -325,10 +379,20 @@ function generateVariants() {
     renderVariantRows(rows);
 }
 function applyPriceToAllVariants() {
-    const price = document.getElementById('product-price')?.value || 0;
-    const buy = document.getElementById('pf-cost')?.value || document.getElementById('product-buying-price')?.value || 0;
-    const wholesale = document.getElementById('product-wholesale')?.value || '';
-    document.querySelectorAll('#variants-tbody tr').forEach(tr => {
+    const price = baseSellingPrice();
+    const buy = baseBuyingPrice();
+    const wholesale = baseWholesalePrice();
+    if (!price || Number(price) <= 0) {
+        alert('Fill Selling Price in Pricing above first.');
+        document.getElementById('section-pricing')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        return;
+    }
+    const rows = document.querySelectorAll('#variants-tbody tr');
+    if (!rows.length) {
+        alert('Generate variants first, then Apply Pricing to all variants.');
+        return;
+    }
+    rows.forEach(tr => {
         tr.querySelector('[data-f=price]') && (tr.querySelector('[data-f=price]').value = price);
         tr.querySelector('[data-f=buying_price]') && (tr.querySelector('[data-f=buying_price]').value = buy);
         tr.querySelector('[data-f=wholesale_price]') && (tr.querySelector('[data-f=wholesale_price]').value = wholesale);
@@ -419,12 +483,74 @@ function addSpecRow() {
 }
 document.addEventListener('DOMContentLoaded', function () {
     toggleVariantBuilder();
+    updateVariantPriceSummary();
+    ['pf-cost', 'product-buying-price', 'product-price', 'product-wholesale'].forEach(id => {
+        document.getElementById(id)?.addEventListener('input', updateVariantPriceSummary);
+    });
     if (Array.isArray(window.__existingVariants) && window.__existingVariants.length) {
         renderVariantRows(window.__existingVariants);
-        if (document.getElementById('has_variants')) {
+        const yes = document.querySelector('input[name="has_variants"][value="1"]');
+        if (yes) {
+            yes.checked = true;
+            toggleVariantBuilder();
+        } else if (document.getElementById('has_variants')) {
             document.getElementById('has_variants').value = '1';
             toggleVariantBuilder();
         }
     }
+
+    async function quickCreate(url, name, selectId, msgId) {
+        const msg = document.getElementById(msgId);
+        const select = document.getElementById(selectId);
+        if (!name || !select) return;
+        if (msg) {
+            msg.style.display = 'block';
+            msg.style.color = '#6b7280';
+            msg.textContent = 'Saving…';
+        }
+        try {
+            const res = await fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '',
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+                body: JSON.stringify({ name: name }),
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.message || Object.values(data.errors || {})[0]?.[0] || 'Could not save');
+            let opt = Array.from(select.options).find(o => String(o.value) === String(data.id));
+            if (!opt) {
+                opt = new Option(data.name, data.id, true, true);
+                select.add(opt);
+            } else {
+                opt.text = data.name;
+                opt.selected = true;
+            }
+            if (msg) {
+                msg.style.color = '#166534';
+                msg.textContent = 'Saved — selected in the list.';
+            }
+        } catch (err) {
+            if (msg) {
+                msg.style.color = '#dc2626';
+                msg.textContent = err.message || 'Could not save';
+            }
+        }
+    }
+
+    document.getElementById('quick-style-save')?.addEventListener('click', async function () {
+        const input = document.getElementById('quick-style-name');
+        await quickCreate(@json(route('admin.product-styles.store')), (input?.value || '').trim(), 'product_style_id', 'quick-style-msg');
+        if (input) input.value = '';
+    });
+
+    document.getElementById('quick-brand-save')?.addEventListener('click', async function () {
+        const input = document.getElementById('quick-brand-name');
+        await quickCreate(@json(route('admin.brands.store')), (input?.value || '').trim(), 'product-brand', 'quick-brand-msg');
+        if (input) input.value = '';
+    });
 });
 </script>

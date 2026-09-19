@@ -88,6 +88,11 @@ class Order extends Model
         return $this->hasMany(LoyaltyTransaction::class);
     }
 
+    public function mpesaTransactions(): HasMany
+    {
+        return $this->hasMany(MpesaTransaction::class, 'sale_id');
+    }
+
     public function isPos(): bool
     {
         return ($this->source ?? null) === 'pos'

@@ -13,9 +13,10 @@ class ApparelCatalogSeeder extends Seeder
     public function run(): void
     {
         $styles = [
-            'T-Shirt', 'Shirt', 'Polo Shirt', 'Blouse', 'Dress', 'Skirt', 'Trousers', 'Jeans',
-            'Shorts', 'Jacket', 'Coat', 'Hoodie', 'Sweater', 'Tracksuit', 'Suit', 'Blazer',
-            'Uniform', 'Shoes', 'Sneakers', 'Sandals', 'Boots', 'Bag', 'Belt', 'Cap', 'Other',
+            'T-Shirt', 'Polo Shirt', 'Shirt', 'Blouse', 'Dress', 'Skirt', 'Jeans', 'Trousers',
+            'Shorts', 'Jacket', 'Coat', 'Sweater', 'Hoodie', 'Tracksuit', 'Suit', 'Blazer',
+            'Jumpsuit', 'Leggings', 'Top', 'Cardigan', 'Underwear', 'Socks', 'Shoes', 'Sandals',
+            'Bags', 'Caps', 'Belts', 'Accessories', 'Uniform', 'Sneakers', 'Boots', 'Other',
         ];
         foreach ($styles as $i => $name) {
             ProductStyle::query()->updateOrCreate(

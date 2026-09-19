@@ -10,11 +10,11 @@
             @csrf
             <div class="ta-field">
                 <label>Name *</label>
-                <input type="text" name="name" value="{{ old('name') }}" required>
+                <input type="text" name="name" class="ta-input" value="{{ old('name') }}" required>
             </div>
             <div class="ta-field">
                 <label>Short description</label>
-                <input type="text" name="short_description" value="{{ old('short_description') }}">
+                <input type="text" name="short_description" class="ta-input" value="{{ old('short_description') }}">
             </div>
             <div style="grid-column:1/-1;">
                 <button type="submit" class="ta-btn">Save brand</button>

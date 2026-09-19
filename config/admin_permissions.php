@@ -43,6 +43,7 @@ return [
     ],
     'prefixes' => [
         'admin.pos.' => 'create_sale',
+        'admin.mpesa.' => 'create_sale',
         'admin.holds.' => 'create_sale',
         'admin.customers.' => 'manage_customers',
         'admin.employees.' => 'manage_employees',

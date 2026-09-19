@@ -22,7 +22,9 @@ class AuthController extends Controller
         ]);
 
         if (! Auth::attempt($credentials, $request->boolean('remember'))) {
-            return back()->withErrors(['email' => 'The provided credentials do not match our records.']);
+            return back()
+                ->withErrors(['email' => 'The provided credentials do not match our records.'])
+                ->withInput($request->only('email', 'password', 'remember'));
         }
 
         $user = Auth::user();
@@ -33,7 +35,9 @@ class AuthController extends Controller
             $request->session()->invalidate();
             $request->session()->regenerateToken();
 
-            return back()->withErrors(['email' => 'You do not have access to the admin panel.']);
+            return back()
+                ->withErrors(['email' => 'You do not have access to the admin panel.'])
+                ->withInput($request->only('email', 'password', 'remember'));
         }
 
         $request->session()->regenerate();

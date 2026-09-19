@@ -276,6 +276,38 @@ class Product extends Model
     }
 
     /**
+     * Size / colour style search terms should filter the catalog, not auto-add a product
+     * whose name/SKU/alias happens to equal the token (e.g. "XL Charcoal Business Suit").
+     */
+    public static function isOptionSearchToken(string $code): bool
+    {
+        $code = trim($code);
+        if ($code === '') {
+            return false;
+        }
+
+        $lower = mb_strtolower($code);
+        $known = [
+            'xxs', 'xs', 's', 'm', 'l', 'xl', 'xxl', 'xxxl', '2xl', '3xl', '4xl', '5xl',
+            'os', 'one size', 'onesize', 'free size', 'freesize',
+        ];
+        if (in_array($lower, $known, true)) {
+            return true;
+        }
+
+        if (! Schema::hasTable('variant_attribute_values')) {
+            return false;
+        }
+
+        return VariantAttributeValue::query()
+            ->where(function ($q) use ($lower) {
+                $q->whereRaw('LOWER(value) = ?', [$lower])
+                    ->orWhereRaw('LOWER(code) = ?', [$lower]);
+            })
+            ->exists();
+    }
+
+    /**
      * @return array{product: self, variant: ?ProductVariant}|null
      */
     public static function resolveActiveScan(string $code): ?array
@@ -290,13 +322,20 @@ class Product extends Model
                 ->with('product')
                 ->where('is_active', true)
                 ->where(function ($q) use ($code) {
-                    $q->where('barcode', $code)->orWhere('sku', $code);
+                    $lower = mb_strtolower($code);
+                    $q->whereRaw('LOWER(barcode) = ?', [$lower])
+                        ->orWhereRaw('LOWER(sku) = ?', [$lower]);
                 })
                 ->whereHas('product', fn ($p) => $p->where('is_active', true))
                 ->first();
             if ($variant) {
                 return ['product' => $variant->product, 'variant' => $variant];
             }
+        }
+
+        // "XL" / "Blue" etc. never auto-add a parent product — show search results instead.
+        if (static::isOptionSearchToken($code)) {
+            return null;
         }
 
         $product = static::findActiveByScan($code);
@@ -317,27 +356,44 @@ class Product extends Model
         $query = static::query()->where('is_active', true);
 
         if (Schema::hasColumn('products', 'barcode')) {
-            $match = (clone $query)->where('barcode', $code)->first();
+            $match = (clone $query)->whereRaw('LOWER(barcode) = ?', [mb_strtolower($code)])->first();
             if ($match) {
                 return $match;
             }
         }
 
         if (Schema::hasTable('product_barcodes')) {
-            $viaExtra = (clone $query)->whereHas('additionalBarcodes', fn ($q) => $q->where('barcode', $code))->first();
+            $viaExtra = (clone $query)->whereHas(
+                'additionalBarcodes',
+                fn ($q) => $q->whereRaw('LOWER(barcode) = ?', [mb_strtolower($code)])
+            )->first();
             if ($viaExtra) {
                 return $viaExtra;
             }
         }
 
+        $skuMatch = (clone $query)->whereRaw('LOWER(sku) = ?', [mb_strtolower($code)])->first();
+        if ($skuMatch) {
+            return $skuMatch;
+        }
+
+        // Exact alias token match (comma / semicolon separated), e.g. "Coke, Coca Cola"
         if (Schema::hasColumn('products', 'search_keywords')) {
-            $viaAlias = (clone $query)->where('search_keywords', 'like', '%'.$code.'%')->first();
-            if ($viaAlias) {
-                return $viaAlias;
+            $candidates = (clone $query)
+                ->where('search_keywords', 'like', '%'.$code.'%')
+                ->limit(40)
+                ->get();
+            foreach ($candidates as $product) {
+                $tokens = preg_split('/[,;\n|]+/', (string) $product->search_keywords, -1, PREG_SPLIT_NO_EMPTY) ?: [];
+                foreach ($tokens as $token) {
+                    if (strcasecmp(trim($token), $code) === 0) {
+                        return $product;
+                    }
+                }
             }
         }
 
-        return $query->where('sku', $code)->first();
+        return null;
     }
 
     public function currentPrice(): float

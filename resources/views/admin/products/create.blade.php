@@ -358,8 +358,8 @@ textarea.pf-input { resize: vertical; min-height: 90px; }
 <div class="pf-jump">
     <a href="#section-basics">Basics</a>
     <a href="#section-apparel">Apparel</a>
-    <a href="#variants-card">Variants</a>
     <a href="#section-pricing">Pricing</a>
+    <a href="#variants-card">Variants</a>
     <a href="#stock-adjust">Inventory</a>
     <a href="#section-details">Image &amp; details</a>
     <a href="#section-specs">More</a>
@@ -368,8 +368,7 @@ textarea.pf-input { resize: vertical; min-height: 90px; }
 <div class="pf-hint">
     <svg width="18" height="18" fill="none" stroke="#a58112" stroke-width="2" viewBox="0 0 24 24" style="flex-shrink:0;margin-top:1px;"><circle cx="12" cy="12" r="10"/><path stroke-linecap="round" d="M12 8v4m0 4h.01"/></svg>
     <div>
-        <strong>Quick start:</strong> Name, selling price, and opening stock are enough for POS.
-        Open optional sections only when you need variants, gallery, shipping, or SEO.
+        <strong>Quick start:</strong> Fill <em>Pricing</em> first. If the product has sizes/colours, Generate variants copies those prices into each row — then change only the rows that differ.
     </div>
 </div>
 
@@ -426,7 +425,11 @@ textarea.pf-input { resize: vertical; min-height: 90px; }
                                 <option value="{{ $brand->id }}" @selected((string)old('brand_id') === (string)$brand->id)>{{ $brand->name }}</option>
                             @endforeach
                         </select>
-                        <a href="{{ route('admin.brands.index') }}" class="pf-help" style="color:#a58112;">+ Add brand</a>
+                        <div style="display:flex;gap:8px;margin-top:8px;align-items:center;">
+                            <input type="text" id="quick-brand-name" class="pf-input" placeholder="New brand name" style="flex:1;">
+                            <button type="button" class="pf-btn-cancel" style="padding:10px 12px;white-space:nowrap;" id="quick-brand-save">Save brand</button>
+                        </div>
+                        <span class="pf-help" id="quick-brand-msg" style="display:none;"></span>
                     </div>
                 </div>
 
@@ -457,16 +460,16 @@ textarea.pf-input { resize: vertical; min-height: 90px; }
                     @error('slug')<span class="pf-error">{{ $message }}</span>@enderror
                 </div>
 
-                <details class="pf-details" style="border:1px solid #e5e7eb;border-radius:12px;overflow:hidden;background:#fafafa;">
-                    <summary class="pf-summary" style="display:flex;align-items:center;gap:10px;padding:12px 14px;">
+                <details class="pf-details pf-pos-extras">
+                    <summary class="pf-summary pf-pos-extras__summary">
                         <div class="pf-card-num is-muted" style="width:24px;height:24px;font-size:14px;">+</div>
                         <div style="flex:1;">
-                            <div style="font-size:13px;font-weight:700;color:#111827;">POS &amp; inventory settings <span class="pf-optional">optional</span></div>
-                            <div style="font-size:11px;color:#6b7280;">Extra barcodes, units, reorder, batch, expiry</div>
+                            <div class="pf-pos-extras__title">POS &amp; inventory settings <span class="pf-optional">optional</span></div>
+                            <div class="pf-pos-extras__sub">Extra barcodes, units, reorder, batch, expiry</div>
                         </div>
                         <svg class="pf-chevron" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
                     </summary>
-                    <div style="padding:14px;display:grid;gap:16px;background:#fff;border-top:1px solid #e5e7eb;">
+                    <div class="pf-pos-extras__body">
                         @include('admin.products._pos_inventory_extras')
                     </div>
                 </details>
@@ -474,57 +477,6 @@ textarea.pf-input { resize: vertical; min-height: 90px; }
         </div>
 
         @include('admin.products._apparel_sections', ['collapseAdvanced' => true])
-
-        <div class="pf-card" id="section-pricing">
-            <div class="pf-card-head">
-                <div class="pf-card-num">4</div>
-                <div>
-                    <h3 class="pf-card-title">Pricing</h3>
-                    <p class="pf-card-sub">Buying, selling, wholesale, tax, and sale discount.</p>
-                </div>
-            </div>
-            <div class="pf-card-body" style="display:grid;gap:16px;">
-                <div class="pf-grid-4">
-                    <div class="pf-field">
-                        <label class="pf-label" for="pf-cost">Buying Price</label>
-                        <input id="pf-cost" type="number" name="buying_price" class="pf-input" step="0.01" min="0" value="{{ old('buying_price', 0) }}">
-                    </div>
-                    <div class="pf-field">
-                        <label class="pf-label" for="product-price">Selling Price <span class="req">*</span></label>
-                        <input id="product-price" type="number" name="price" class="pf-input @error('price') is-invalid @enderror" step="0.01" min="0" value="{{ old('price', 0) }}" required>
-                        @error('price')<span class="pf-error">{{ $message }}</span>@enderror
-                    </div>
-                    <div class="pf-field">
-                        <label class="pf-label" for="product-wholesale">Wholesale Price</label>
-                        <input id="product-wholesale" type="number" name="wholesale_price" class="pf-input" step="0.01" min="0" value="{{ old('wholesale_price') }}">
-                        <span class="pf-help">Used when checkout is set to Wholesale.</span>
-                    </div>
-                    <div class="pf-field">
-                        <label class="pf-label" for="product-tax">Tax Rate %</label>
-                        <input id="product-tax" type="number" name="tax_rate" class="pf-input" step="0.01" min="0" max="100" value="{{ old('tax_rate', 16) }}">
-                        <span class="pf-help">Leave 0 to use the shop default.</span>
-                    </div>
-                </div>
-                <div class="pf-grid-2">
-                    <div class="pf-field">
-                        <label class="pf-label" for="product-discount-percent">Discount (%)</label>
-                        <div class="pf-input-wrap">
-                            <input id="product-discount-percent" type="number" name="discount_percent" class="pf-input" step="1" min="1" max="99" value="{{ old('discount_percent') }}" placeholder="e.g. 10">
-                            <span class="pf-input-suffix">%</span>
-                        </div>
-                    </div>
-                    <div class="pf-field">
-                        <label class="pf-label" for="product-sale-price">Sale Price (KES)</label>
-                        <input id="product-sale-price" type="number" name="sale_price" class="pf-input @error('sale_price') is-invalid @enderror" step="0.01" min="0" value="{{ old('sale_price') }}" placeholder="0.00" readonly>
-                        @error('sale_price')<span class="pf-error">{{ $message }}</span>@enderror
-                    </div>
-                </div>
-                <div class="pf-sale-notice" id="pf-sale-notice">
-                    <span>Sale Price is calculated automatically: <strong>Selling Price − Discount</strong></span>
-                    <span>You save: <strong id="pf-you-save">KES 0.00</strong></span>
-                </div>
-            </div>
-        </div>
 
         <div class="pf-card" id="stock-adjust">
             <div class="pf-card-head">
@@ -535,6 +487,9 @@ textarea.pf-input { resize: vertical; min-height: 90px; }
                 </div>
             </div>
             <div class="pf-card-body" style="display:grid;gap:16px;">
+                <div id="stock-variants-notice" hidden style="display:none;padding:12px 14px;border-radius:12px;border:1px solid #fcd34d;background:#fffbeb;font-size:13px;color:#92400e;">
+                    Variants are on — set stock in the <strong>Variants</strong> table (columns for each location), not here.
+                </div>
                 @include('admin.products._location_stock', ['stockLocations' => $stockLocations ?? \App\Models\StockLocation::orderedActive()])
             </div>
         </div>
@@ -572,9 +527,15 @@ textarea.pf-input { resize: vertical; min-height: 90px; }
                     </div>
                     <div class="pf-field" style="margin-top:12px;">
                         <label class="pf-label" for="product-image-url">Or paste image URL</label>
-                        <input id="product-image-url" type="url" name="image_url" class="pf-input @error('image_url') is-invalid @enderror" value="{{ old('image_url') }}" placeholder="https://...">
+                        <input id="product-image-url" type="text" name="image_url" inputmode="text" autocomplete="off" class="pf-input @error('image_url') is-invalid @enderror" value="{{ old('image_url') }}" placeholder="https://… or /storage/…">
+                        <span class="pf-help">Optional. Relative /storage paths and https links are both fine.</span>
                         @error('image_url')<span class="pf-error">{{ $message }}</span>@enderror
                     </div>
+                </div>
+                <div class="pf-field">
+                    <label class="pf-label">Additional images</label>
+                    <input type="file" name="gallery_files[]" class="pf-input" accept="image/png,image/jpeg,image/webp" multiple>
+                    <span class="pf-help">JPG, PNG or WebP up to 2MB each. Shown after the main product image.</span>
                 </div>
                 <div class="pf-field">
                     <label class="pf-label" for="product-description">Description</label>

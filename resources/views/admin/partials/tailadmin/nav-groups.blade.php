@@ -52,6 +52,7 @@
                     @endif
                     @if($can('manage_products'))
                     <li><a href="{{ route('admin.brands.index') }}" class="{{ $submenuLink(request()->routeIs('admin.brands.*')) }}">Brands</a></li>
+                    <li><a href="{{ route('admin.product-styles.index') }}" class="{{ $submenuLink(request()->routeIs('admin.product-styles.*')) }}">Product Types</a></li>
                     @endif
                     @if($can('manage_purchases'))
                     <li><a href="{{ route('admin.purchases.index') }}" class="{{ $submenuLink(request()->routeIs('admin.purchases.*')) }}">Purchases</a></li>

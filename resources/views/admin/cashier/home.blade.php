@@ -415,18 +415,18 @@
         <div>
             <div class="mb-3 flex items-center justify-between">
                 <h2 class="text-base font-semibold text-gray-800 dark:text-white/90">Quick Actions</h2>
-                <a href="{{ route('admin.pos.index') }}" class="text-sm font-semibold text-brand-600">See All →</a>
+                <a href="{{ route('admin.pos.index') }}" class="dash-qa-see-all">See All →</a>
             </div>
             <div class="grid grid-cols-2 gap-2.5">
                 @if(auth()->user()?->hasPermission('manage_products'))
-                <a href="{{ $productsHref }}" class="rounded-2xl bg-[#e8f0fe] p-3.5 no-underline"><p class="text-sm font-bold text-gray-800">View Products</p><p class="text-[11px] text-gray-500">Browse inventory</p></a>
+                <a href="{{ $productsHref }}" class="rounded-2xl bg-[#e8f0fe] p-3.5 no-underline dark:bg-blue-500/20 dark:ring-1 dark:ring-blue-400/30"><p class="text-sm font-bold text-gray-800 dark:text-white">View Products</p><p class="text-[11px] text-gray-500 dark:text-gray-300">Browse inventory</p></a>
                 @endif
-                <a href="{{ route('admin.orders.index') }}" class="rounded-2xl bg-[#e7f8ef] p-3.5 no-underline"><p class="text-sm font-bold text-gray-800">Sales History</p><p class="text-[11px] text-gray-500">View past sales</p></a>
-                <a href="{{ $printHref }}" class="rounded-2xl bg-[#fde8e8] p-3.5 no-underline"><p class="text-sm font-bold text-gray-800">Print Receipt</p><p class="text-[11px] text-gray-500">{{ $lastReceipt?->order_number ?: 'No sales yet' }}</p></a>
+                <a href="{{ route('admin.orders.index') }}" class="rounded-2xl bg-[#e7f8ef] p-3.5 no-underline dark:bg-success-500/20 dark:ring-1 dark:ring-success-400/30"><p class="text-sm font-bold text-gray-800 dark:text-white">Sales History</p><p class="text-[11px] text-gray-500 dark:text-gray-300">View past sales</p></a>
+                <a href="{{ $printHref }}" class="rounded-2xl bg-[#fde8e8] p-3.5 no-underline dark:bg-error-500/20 dark:ring-1 dark:ring-error-400/30"><p class="text-sm font-bold text-gray-800 dark:text-white">Print Receipt</p><p class="text-[11px] text-gray-500 dark:text-gray-300">{{ $lastReceipt?->order_number ?: 'No sales yet' }}</p></a>
                 @if(auth()->user()?->hasPermission('manage_coupons'))
-                <a href="{{ $discountHref }}" class="rounded-2xl bg-[#fce8f3] p-3.5 no-underline"><p class="text-sm font-bold text-gray-800">Apply Discount</p><p class="text-[11px] text-gray-500">Offers &amp; coupons</p></a>
+                <a href="{{ $discountHref }}" class="rounded-2xl bg-[#fce8f3] p-3.5 no-underline dark:bg-pink-500/20 dark:ring-1 dark:ring-pink-400/30"><p class="text-sm font-bold text-gray-800 dark:text-white">Apply Discount</p><p class="text-[11px] text-gray-500 dark:text-gray-300">Offers &amp; coupons</p></a>
                 @elseif(auth()->user()?->hasPermission('manage_customers'))
-                <a href="{{ route('admin.customers.index') }}" class="rounded-2xl bg-[#fce8f3] p-3.5 no-underline"><p class="text-sm font-bold text-gray-800">Customers</p><p class="text-[11px] text-gray-500">Shop customers</p></a>
+                <a href="{{ route('admin.customers.index') }}" class="rounded-2xl bg-[#fce8f3] p-3.5 no-underline dark:bg-pink-500/20 dark:ring-1 dark:ring-pink-400/30"><p class="text-sm font-bold text-gray-800 dark:text-white">Customers</p><p class="text-[11px] text-gray-500 dark:text-gray-300">Shop customers</p></a>
                 @endif
             </div>
         </div>

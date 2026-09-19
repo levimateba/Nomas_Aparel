@@ -786,7 +786,7 @@ class ProductController extends Controller
             'categories' => Category::query()->where('is_active', true)->orderBy('name')->get(),
             'vendors' => Vendor::query()->where('is_active', true)->orderBy('name')->get(),
             'brands' => Schema::hasTable('product_brands')
-                ? ProductBrand::query()->where('is_active', true)->orderBy('name')->get()
+                ? ProductBrand::query()->orderBy('name')->get()
                 : collect(),
             'suppliers' => Schema::hasTable('suppliers')
                 ? Supplier::query()->where('is_active', true)->orderBy('name')->get()

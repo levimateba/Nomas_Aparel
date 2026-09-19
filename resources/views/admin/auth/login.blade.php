@@ -520,7 +520,7 @@
                         <span class="ico" aria-hidden="true">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16v12H4z"/><path stroke-linecap="round" stroke-linejoin="round" d="M4 7l8 6 8-6"/></svg>
                         </span>
-                        <input id="email" type="email" name="email" value="{{ old('email') }}" placeholder="Enter your email" required autofocus>
+                        <input id="email" type="email" name="email" value="{{ old('email') }}" placeholder="Enter your email" required autocomplete="username" @if(!$errors->any()) autofocus @endif>
                     </div>
                 </div>
 
@@ -530,7 +530,7 @@
                         <span class="ico" aria-hidden="true">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="5" y="11" width="14" height="10" rx="2"/><path stroke-linecap="round" d="M8 11V8a4 4 0 018 0v3"/></svg>
                         </span>
-                        <input id="password" type="password" name="password" placeholder="Enter your password" required>
+                        <input id="password" type="password" name="password" value="{{ old('password') }}" placeholder="Enter your password" required autocomplete="current-password" @if($errors->any()) autofocus @endif>
                         <button type="button" class="toggle-pass" id="toggle-pass" aria-label="Show password">
                             <svg id="eye-open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg>
                             <svg id="eye-closed" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" style="display:none;"><path stroke-linecap="round" stroke-linejoin="round" d="M17.94 17.94A10.07 10.07 0 0112 19c-7 0-11-7-11-7a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 7 11 7a18.5 18.5 0 01-2.16 3.19M1 1l22 22"/><path stroke-linecap="round" d="M14.12 14.12A3 3 0 019.88 9.88"/></svg>
@@ -605,7 +605,21 @@
         closed.style.display = show ? 'block' : 'none';
         toggle.setAttribute('aria-label', show ? 'Hide password' : 'Show password');
     });
+
+    // After a failed login, keep values editable (select password for quick fix).
+    @if($errors->any())
+    requestAnimationFrame(function () {
+        var email = document.getElementById('email');
+        if (input && input.value) {
+            input.focus();
+            try { input.select(); } catch (e) {}
+        } else if (email) {
+            email.focus();
+        }
+    });
+    @endif
 })();
 </script>
+@include('partials.pwa-install', ['pwaContext' => 'admin'])
 </body>
 </html>

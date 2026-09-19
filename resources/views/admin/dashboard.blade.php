@@ -133,7 +133,7 @@
         <div class="min-w-0">
             <div class="mb-3 flex items-center justify-between">
                 <h2 class="text-base font-semibold text-gray-800 dark:text-white/90">Quick Actions</h2>
-                <a href="{{ route('admin.cashier.home') }}" class="text-sm font-semibold text-brand-600 hover:underline">See All →</a>
+                <a href="{{ route('admin.cashier.home') }}" class="dash-qa-see-all">See All →</a>
             </div>
 
             <div class="dash-qa-grid">

@@ -86,7 +86,7 @@ textarea.pf-input { resize:vertical; min-height:90px; }
 
 @section('content')
 @include('admin.partials.backup-reminder')
-<form method="POST" action="{{ route('admin.products.update', $product) }}" enctype="multipart/form-data" id="pf-form">
+<form method="POST" action="{{ route('admin.products.update', $product) }}" enctype="multipart/form-data" id="pf-form" novalidate>
 @csrf @method('PUT')
 
 <div class="pf-page">
@@ -150,6 +150,11 @@ textarea.pf-input { resize:vertical; min-height:90px; }
                                 <option value="{{ $brand->id }}" @selected((string)old('brand_id', $product->brand_id) === (string)$brand->id)>{{ $brand->name }}</option>
                             @endforeach
                         </select>
+                        <div style="display:flex;gap:8px;margin-top:8px;align-items:center;">
+                            <input type="text" id="quick-brand-name" class="pf-input" placeholder="New brand name" style="flex:1;">
+                            <button type="button" class="pf-btn-cancel" style="padding:10px 12px;white-space:nowrap;" id="quick-brand-save">Save brand</button>
+                        </div>
+                        <span class="pf-help" id="quick-brand-msg" style="display:none;"></span>
                     </div>
                     <div class="pf-field">
                         <label class="pf-label" for="product-vendor">Marketplace vendor</label>
@@ -170,57 +175,18 @@ textarea.pf-input { resize:vertical; min-height:90px; }
 
         @include('admin.products._apparel_sections', ['product' => $product])
 
-        <div class="pf-card">
-            <div class="pf-card-head">
-                <div class="pf-card-num">2</div>
-                <h3 class="pf-card-title">Pricing</h3>
-            </div>
-            <div class="pf-card-body" style="display:grid;gap:16px;">
-                <div class="pf-grid-4">
-                    <div class="pf-field">
-                        <label class="pf-label" for="product-buying-price">Buying Price</label>
-                        <input id="product-buying-price" type="number" name="buying_price" class="pf-input" step="0.01" min="0" value="{{ old('buying_price', $product->buying_price) }}">
-                    </div>
-                    <div class="pf-field">
-                        <label class="pf-label" for="product-price">Selling Price <span class="req">*</span></label>
-                        <input id="product-price" type="number" name="price" class="pf-input @error('price') is-invalid @enderror" step="0.01" min="0" value="{{ old('price',$product->price) }}" required>
-                        @error('price')<span class="pf-error">{{ $message }}</span>@enderror
-                    </div>
-                    <div class="pf-field">
-                        <label class="pf-label" for="product-wholesale">Wholesale Price</label>
-                        <input id="product-wholesale" type="number" name="wholesale_price" class="pf-input" step="0.01" min="0" value="{{ old('wholesale_price', $product->wholesale_price) }}">
-                    </div>
-                    <div class="pf-field">
-                        <label class="pf-label" for="product-tax">Tax Rate %</label>
-                        <input id="product-tax" type="number" name="tax_rate" class="pf-input" step="0.01" min="0" max="100" value="{{ old('tax_rate', $product->tax_rate ?? 16) }}">
-                    </div>
-                </div>
-                <div class="pf-grid-2">
-                    <div class="pf-field">
-                        <label class="pf-label" for="product-discount-percent">Discount (%)</label>
-                        <div class="pf-input-wrap">
-                            <input id="product-discount-percent" type="number" name="discount_percent" class="pf-input" step="1" min="1" max="99" value="{{ old('discount_percent', $product->hasSale() ? $product->discountPercent() : '') }}">
-                            <span class="pf-input-suffix">%</span>
-                        </div>
-                    </div>
-                    <div class="pf-field">
-                        <label class="pf-label" for="product-sale-price">Sale Price (KES)</label>
-                        <input id="product-sale-price" type="number" name="sale_price" class="pf-input @error('sale_price') is-invalid @enderror" step="0.01" min="0" value="{{ old('sale_price',$product->sale_price) }}">
-                        @error('sale_price')<span class="pf-error">{{ $message }}</span>@enderror
-                    </div>
-                </div>
-            </div>
-        </div>
-
         <div class="pf-card" id="stock-adjust">
             <div class="pf-card-head">
-                <div class="pf-card-num">3</div>
+                <div class="pf-card-num">5</div>
                 <h3 class="pf-card-title">Inventory</h3>
             </div>
             <div class="pf-card-body" style="display:grid;gap:16px;">
+                <div id="stock-variants-notice" hidden style="display:none;padding:12px 14px;border-radius:12px;border:1px solid #fcd34d;background:#fffbeb;font-size:13px;color:#92400e;">
+                    Variants are on — set stock in the <strong>Variants</strong> table (columns for each location), not here.
+                </div>
                 @include('admin.products._location_stock', ['product' => $product, 'stockLocations' => $stockLocations ?? \App\Models\StockLocation::orderedActive()])
                 @if($product->usesVariants())
-                    <p class="pf-help" style="margin:0;">This product uses variants — manage Store / Shop quantities in the Variants table below.</p>
+                    <p class="pf-help" style="margin:0;">This product uses variants — manage Store / Shop quantities in the Variants table above.</p>
                 @endif
             </div>
         </div>
@@ -251,8 +217,32 @@ textarea.pf-input { resize:vertical; min-height:90px; }
                 </div>
                 <div class="pf-field">
                     <label class="pf-label" for="product-image-url">Or paste image URL</label>
-                    <input id="product-image-url" type="url" name="image_url" class="pf-input @error('image_url') is-invalid @enderror" value="{{ old('image_url',$product->image_url) }}" placeholder="https://...">
+                    @php
+                        $imageUrlValue = old('image_url');
+                        if ($imageUrlValue === null) {
+                            $currentImage = (string) ($product->image_url ?? '');
+                            // Prefill only absolute links; keep /storage paths out of the box (shown above).
+                            $imageUrlValue = preg_match('#^https?://#i', $currentImage) ? $currentImage : '';
+                        }
+                    @endphp
+                    <input id="product-image-url" type="text" name="image_url" inputmode="text" autocomplete="off" class="pf-input @error('image_url') is-invalid @enderror" value="{{ $imageUrlValue }}" placeholder="https://… or /storage/… (leave blank to keep current)">
+                    <span class="pf-help">Leave blank to keep the current image. Relative /storage paths and https links are both fine.</span>
                     @error('image_url')<span class="pf-error">{{ $message }}</span>@enderror
+                </div>
+                <div class="pf-field">
+                    <label class="pf-label">Additional images</label>
+                    <input type="file" name="gallery_files[]" class="pf-input" accept="image/png,image/jpeg,image/webp" multiple>
+                    <span class="pf-help">JPG, PNG or WebP up to 2MB each. Shown after the main product image.</span>
+                    @if($product->images && $product->images->count())
+                        <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;">
+                            @foreach($product->images as $img)
+                                <div style="width:72px;height:72px;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;background:#f9fafb;">
+                                    <img src="{{ $img->image_url }}" alt="" style="width:100%;height:100%;object-fit:cover;">
+                                    <input type="hidden" name="gallery_urls[]" value="{{ $img->image_url }}">
+                                </div>
+                            @endforeach
+                        </div>
+                    @endif
                 </div>
                 <div class="pf-field">
                     <label class="pf-label" for="product-description">Description</label>
@@ -307,7 +297,9 @@ textarea.pf-input { resize:vertical; min-height:90px; }
     </div>
 </div>
 
-{{-- Bottom bar --}}
+</form>
+
+{{-- Bottom bar: Delete must stay outside the edit form (nested forms make Update send DELETE). --}}
 <div class="pf-bottom">
     <a href="{{ route('admin.products.index') }}" class="pf-btn-cancel">
         <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
@@ -315,20 +307,19 @@ textarea.pf-input { resize:vertical; min-height:90px; }
     </a>
     <div class="pf-btn-group">
         <form method="POST" action="{{ route('admin.products.destroy', $product) }}" style="margin:0;" onsubmit="return confirm('Delete this product permanently?')">
-            @csrf @method('DELETE')
+            @csrf
+            @method('DELETE')
             <button type="submit" class="pf-btn-danger">
                 <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
                 Delete Product
             </button>
         </form>
-        <button type="submit" class="pf-btn-primary">
+        <button type="submit" form="pf-form" class="pf-btn-primary">
             <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
             Update Product
         </button>
     </div>
 </div>
-
-</form>
 
 <script>
 (function(){

@@ -22,8 +22,11 @@
     }
 @endphp
 @if(!empty($backupReminder))
-<div class="card" style="padding:14px 16px;margin-bottom:14px;border-color:#fcd34d;background:#fffbeb;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:center;">
-    <div><strong>Backup reminder:</strong> {{ $backupReminder['message'] }}</div>
-    <a class="btn" href="{{ route('admin.backups.index') }}">Backup now</a>
+<div class="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-warning-300 bg-warning-50 px-4 py-3 text-sm text-warning-800 dark:border-warning-500/40 dark:bg-warning-500/15 dark:text-warning-200">
+    <div>
+        <strong class="font-semibold text-warning-900 dark:text-warning-100">Backup reminder:</strong>
+        <span class="text-warning-800 dark:text-warning-200"> {{ $backupReminder['message'] }}</span>
+    </div>
+    <a class="ta-btn ta-btn-sm shrink-0" href="{{ route('admin.backups.index') }}">Backup now</a>
 </div>
 @endif

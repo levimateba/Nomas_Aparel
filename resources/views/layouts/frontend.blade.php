@@ -819,5 +819,6 @@
             initializeServiceTabs();
         });
     </script>
+    @include('partials.pwa-install', ['pwaContext' => 'storefront'])
 </body>
 </html>

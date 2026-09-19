@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\ProductBrand;
 use App\Support\Audit;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -25,17 +26,40 @@ class BrandController extends Controller
         return view('admin.brands.index', compact('brands'));
     }
 
-    public function store(Request $request): RedirectResponse
+    public function store(Request $request): JsonResponse|RedirectResponse
     {
         abort_unless(auth()->user()?->hasPermission('manage_products'), 403);
 
         $data = $request->validate([
-            'name' => ['required', 'string', 'max:120', 'unique:product_brands,name'],
+            'name' => ['required', 'string', 'max:120'],
             'short_description' => ['nullable', 'string', 'max:255'],
         ]);
 
-        $brand = ProductBrand::create($data + ['is_active' => true]);
-        Audit::log('brand_created', 'Created brand '.$brand->name, $brand, [], 'inventory');
+        $name = trim($data['name']);
+        $brand = ProductBrand::query()
+            ->whereRaw('LOWER(name) = ?', [mb_strtolower($name)])
+            ->first();
+
+        if ($brand) {
+            $brand->forceFill([
+                'is_active' => true,
+                'short_description' => $data['short_description'] ?? $brand->short_description,
+            ])->save();
+        } else {
+            $brand = ProductBrand::create([
+                'name' => $name,
+                'short_description' => $data['short_description'] ?? null,
+                'is_active' => true,
+            ]);
+            Audit::log('brand_created', 'Created brand '.$brand->name, $brand, [], 'inventory');
+        }
+
+        if ($request->expectsJson() || $request->ajax() || $request->wantsJson()) {
+            return response()->json([
+                'id' => $brand->id,
+                'name' => $brand->name,
+            ]);
+        }
 
         return back()->with('success', 'Brand saved.');
     }

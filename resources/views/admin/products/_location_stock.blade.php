@@ -29,14 +29,14 @@
     }
     $needsShopTransfer = $isEdit && $shopFloor && $mainStore && $shopQty <= 0 && $mainQty > 0 && ! ($product->usesVariants() ?? false);
 @endphp
-<div id="location-stock-simple" style="display:grid;gap:12px;">
+<div id="location-stock-simple" class="pf-location-stock" style="display:grid;gap:12px;">
     <div class="pf-help">Stock by location. Total is calculated automatically — do not enter a separate total. Prefer <strong>Transfer</strong> for Store → Shop moves (keeps an audit trail).</div>
 
     @if($needsShopTransfer)
-        <div style="display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;border-radius:12px;border:1px solid #fcd34d;background:#fffbeb;">
+        <div class="pf-location-stock__alert">
             <div style="min-width:0;">
-                <div style="font-size:13px;font-weight:700;color:#92400e;">{{ $shopFloor->name }} is out of stock</div>
-                <div style="font-size:12px;color:#a16207;margin-top:2px;">
+                <div class="pf-location-stock__alert-title">{{ $shopFloor->name }} is out of stock</div>
+                <div class="pf-location-stock__alert-sub">
                     {{ $mainStore->name }} has {{ number_format($mainQty) }} units. Transfer to {{ $shopFloor->name }} before selling on POS.
                 </div>
             </div>
@@ -52,8 +52,8 @@
         </div>
     @endif
 
-    <div class="table-wrap">
-        <table>
+    <div class="table-wrap pf-location-stock__table-wrap">
+        <table class="pf-location-stock__table">
             <thead>
                 <tr>
                     <th>Location</th>
@@ -70,12 +70,12 @@
                     $reorder = $row['reorder'];
                     $isShopEmpty = $shopFloor && (int) $loc->id === (int) $shopFloor->id && (int) $val <= 0;
                 @endphp
-                <tr style="{{ $isShopEmpty && $mainQty > 0 ? 'background:#fffbeb;' : '' }}">
+                <tr class="{{ $isShopEmpty && $mainQty > 0 ? 'is-warning' : '' }}">
                     <td>
-                        <strong>{{ $loc->name }}</strong>
-                        <div class="muted" style="font-size:11px;">{{ strtoupper($loc->type) }}</div>
+                        <strong class="pf-location-stock__name">{{ $loc->name }}</strong>
+                        <div class="pf-location-stock__type">{{ strtoupper($loc->type) }}</div>
                         @if($isShopEmpty && $mainQty > 0)
-                            <div style="font-size:11px;color:#b45309;margin-top:2px;">Empty — transfer from store to sell on POS</div>
+                            <div class="pf-location-stock__warn">Empty — transfer from store to sell on POS</div>
                         @endif
                     </td>
                     <td style="text-align:right;">
@@ -86,14 +86,14 @@
                     </td>
                     <td style="text-align:right;white-space:nowrap;">
                         @if($isEdit && $mainStore && $shopFloor && (int) $loc->id === (int) $shopFloor->id && $mainQty > 0)
-                            <a href="{{ route('admin.stock-transfers.create', ['from_location_id' => $mainStore->id, 'to_location_id' => $shopFloor->id, 'product_id' => $product->id]) }}" style="font-size:12px;font-weight:700;color:#a58112;text-decoration:none;">Transfer →</a>
+                            <a href="{{ route('admin.stock-transfers.create', ['from_location_id' => $mainStore->id, 'to_location_id' => $shopFloor->id, 'product_id' => $product->id]) }}" class="pf-location-stock__transfer">Transfer →</a>
                         @endif
                     </td>
                 </tr>
             @endforeach
             <tr>
-                <td><strong>Total Stock</strong></td>
-                <td style="text-align:right;"><strong id="location-stock-total">0</strong></td>
+                <td><strong class="pf-location-stock__name">Total Stock</strong></td>
+                <td style="text-align:right;"><strong id="location-stock-total" class="pf-location-stock__name">0</strong></td>
                 <td></td>
                 <td></td>
             </tr>

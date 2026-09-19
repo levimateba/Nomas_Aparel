@@ -6,12 +6,13 @@
 @section('content')
 <div class="ta-page">
 @if(!empty($backupReminder))
-<x-admin.list-card>
-    <div class="flex flex-wrap items-center justify-between gap-3">
-        <div><strong>Backup reminder:</strong> {{ $backupReminder['message'] }}</div>
-        <a class="ta-btn" href="{{ route('admin.backups.index') }}">Backup now</a>
+<div class="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-warning-300 bg-warning-50 px-4 py-3 text-sm text-warning-800 dark:border-warning-500/40 dark:bg-warning-500/15 dark:text-warning-200">
+    <div>
+        <strong class="font-semibold text-warning-900 dark:text-warning-100">Backup reminder:</strong>
+        <span class="text-warning-800 dark:text-warning-200"> {{ $backupReminder['message'] }}</span>
     </div>
-</x-admin.list-card>
+    <a class="ta-btn ta-btn-sm shrink-0" href="{{ route('admin.backups.index') }}">Backup now</a>
+</div>
 @endif
 
 <x-admin.list-card title="Audit trail">

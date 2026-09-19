@@ -128,6 +128,33 @@
         }
     </style>
     @stack('styles')
+    <style>
+        html.dark #admin-global-search,
+        html.dark .admin-global-search-input {
+            color: #ffffff !important;
+            -webkit-text-fill-color: #ffffff !important;
+            caret-color: #c9a227;
+            background-color: #1f2937 !important;
+            border-color: #4b5563 !important;
+        }
+        html.dark #admin-global-search::placeholder,
+        html.dark .admin-global-search-input::placeholder {
+            color: #9ca3af !important;
+            -webkit-text-fill-color: #9ca3af !important;
+            opacity: 1;
+        }
+        html.dark #admin-global-search:-webkit-autofill,
+        html.dark #admin-global-search:-webkit-autofill:focus {
+            -webkit-text-fill-color: #ffffff !important;
+            box-shadow: 0 0 0 1000px #1f2937 inset !important;
+        }
+        .admin-gs-item.is-active {
+            background: rgba(165, 129, 18, 0.12);
+        }
+        html.dark .admin-gs-item.is-active {
+            background: rgba(165, 129, 18, 0.18);
+        }
+    </style>
 </head>
 <body class="font-outfit">
 @php
@@ -166,8 +193,9 @@
     $reportsOpen = request()->routeIs('admin.reports.*');
     $inventoryOpen = request()->routeIs('admin.products.*')
         || request()->routeIs('admin.categories.*')
-        || request()->routeIs('admin.stock-takes.*')
         || request()->routeIs('admin.brands.*')
+        || request()->routeIs('admin.product-styles.*')
+        || request()->routeIs('admin.stock-takes.*')
         || request()->routeIs('admin.purchases.*')
         || request()->routeIs('admin.purchase-orders.*')
         || request()->routeIs('admin.stock-overview.*')
@@ -266,13 +294,167 @@
 
 <script>
     document.addEventListener('keydown', function (event) {
-        if (event.key !== 'F2') return;
         const tag = (event.target && event.target.tagName) ? event.target.tagName.toLowerCase() : '';
-        if (['input', 'textarea', 'select'].includes(tag) || event.target?.isContentEditable) return;
+        const typing = ['input', 'textarea', 'select'].includes(tag) || event.target?.isContentEditable;
+
+        if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
+            const search = document.getElementById('admin-global-search');
+            if (search) {
+                event.preventDefault();
+                search.focus();
+                search.select();
+                search.dispatchEvent(new Event('input', { bubbles: true }));
+            }
+            return;
+        }
+
+        if (event.key !== 'F2') return;
+        if (typing) return;
         event.preventDefault();
         window.location.href = @json(route('admin.pos.index'));
     });
+
+    (function () {
+        const wrap = document.getElementById('admin-global-search-wrap');
+        const input = document.getElementById('admin-global-search');
+        const panel = document.getElementById('admin-global-search-results');
+        const kbd = document.getElementById('admin-global-search-kbd');
+        const pagesEl = document.getElementById('admin-global-search-pages');
+        const productsUrlEl = document.getElementById('admin-global-search-products-url');
+        if (!wrap || !input || !panel || !pagesEl || !productsUrlEl) return;
+
+        let pages = [];
+        let productsUrl = '';
+        try { pages = JSON.parse(pagesEl.textContent || '[]'); } catch (e) { pages = []; }
+        try { productsUrl = JSON.parse(productsUrlEl.textContent || '""'); } catch (e) { productsUrl = ''; }
+        if (!productsUrl) productsUrl = @json(route('admin.products.index'));
+        let activeIndex = -1;
+        let currentItems = [];
+
+        function hide() {
+            panel.classList.add('hidden');
+            panel.innerHTML = '';
+            activeIndex = -1;
+            currentItems = [];
+            input.setAttribute('aria-expanded', 'false');
+        }
+
+        function show() {
+            panel.classList.remove('hidden');
+            input.setAttribute('aria-expanded', 'true');
+        }
+
+        function escapeHtml(str) {
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;');
+        }
+
+        function matchPages(q) {
+            const needle = q.trim().toLowerCase();
+            if (!needle) return pages.slice(0, 8);
+            return pages.filter(function (p) {
+                const hay = (p.label + ' ' + p.group + ' ' + (p.keywords || '')).toLowerCase();
+                return hay.indexOf(needle) !== -1;
+            }).slice(0, 10);
+        }
+
+        function render() {
+            const q = input.value.trim();
+            const matched = matchPages(q);
+            currentItems = matched.map(function (p) {
+                return { type: 'page', label: p.label, group: p.group, url: p.url };
+            });
+
+            if (q !== '') {
+                currentItems.push({
+                    type: 'products',
+                    label: 'Search products for “' + q + '”',
+                    group: 'Products',
+                    url: productsUrl + (productsUrl.indexOf('?') >= 0 ? '&' : '?') + 'q=' + encodeURIComponent(q),
+                });
+            }
+
+            if (!currentItems.length) {
+                panel.innerHTML = '<div class="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">No matching pages</div>';
+                show();
+                return;
+            }
+
+            activeIndex = 0;
+            panel.innerHTML = currentItems.map(function (item, i) {
+                return '<button type="button" role="option" data-idx="' + i + '" class="admin-gs-item flex w-full items-center justify-between gap-3 px-4 py-2.5 text-left hover:bg-gray-50 dark:hover:bg-white/5 ' + (i === 0 ? 'is-active bg-gray-50 dark:bg-white/5' : '') + '">'
+                    + '<span class="min-w-0">'
+                    + '<span class="block truncate text-sm font-semibold text-gray-900 dark:text-white">' + escapeHtml(item.label) + '</span>'
+                    + '<span class="block truncate text-xs text-gray-500 dark:text-gray-400">' + escapeHtml(item.group) + '</span>'
+                    + '</span>'
+                    + '<span class="shrink-0 text-[10px] font-bold uppercase tracking-wide text-gray-400">' + (item.type === 'products' ? 'Enter' : 'Go') + '</span>'
+                    + '</button>';
+            }).join('');
+            show();
+        }
+
+        function setActive(idx) {
+            const buttons = panel.querySelectorAll('.admin-gs-item');
+            if (!buttons.length) return;
+            activeIndex = (idx + buttons.length) % buttons.length;
+            buttons.forEach(function (btn, i) {
+                btn.classList.toggle('is-active', i === activeIndex);
+                btn.classList.toggle('bg-gray-50', i === activeIndex);
+                btn.classList.toggle('dark:bg-white/5', i === activeIndex);
+            });
+            buttons[activeIndex].scrollIntoView({ block: 'nearest' });
+        }
+
+        function go(idx) {
+            const item = currentItems[idx];
+            if (!item || !item.url) return;
+            window.location.href = item.url;
+        }
+
+        input.addEventListener('focus', render);
+        input.addEventListener('input', render);
+
+        input.addEventListener('keydown', function (e) {
+            if (panel.classList.contains('hidden') && (e.key === 'ArrowDown' || e.key === 'Enter')) {
+                render();
+            }
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                setActive(activeIndex + 1);
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                setActive(activeIndex - 1);
+            } else if (e.key === 'Enter') {
+                e.preventDefault();
+                if (activeIndex >= 0) go(activeIndex);
+            } else if (e.key === 'Escape') {
+                hide();
+                input.blur();
+            }
+        });
+
+        panel.addEventListener('mousedown', function (e) {
+            const btn = e.target.closest('.admin-gs-item');
+            if (!btn) return;
+            e.preventDefault();
+            go(Number(btn.getAttribute('data-idx')));
+        });
+
+        document.addEventListener('click', function (e) {
+            if (!wrap.contains(e.target)) hide();
+        });
+
+        kbd?.addEventListener('click', function () {
+            input.focus();
+            input.select();
+            render();
+        });
+    })();
 </script>
 @stack('scripts')
+@include('partials.pwa-install', ['pwaContext' => 'admin'])
 </body>
 </html>
